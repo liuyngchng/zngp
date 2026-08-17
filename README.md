@@ -1,0 +1,314 @@
+# 语音笔记
+
+语音笔记是一款 Android / iOS 双平台应用，支持离线语音转写（ASR）。录制或导入音频后，自动将语音转为文字。
+
+## 功能
+
+- **录音与导入** — 实时录音（Android 前台服务 + WakeLock 保活 / iOS 后台音频模式）；Android 版额外支持从本地导入音频文件
+- **离线语音转写** — 本地 Sherpa-ONNX + SenseVoice 模型（INT8 / FP32），无需网络
+- **离线标点恢复** — 可选下载 CT-Transformer 模型，给转写文本自动添加标点符号
+- **音频回放** — 播放/暂停、快进快退 15s、进度拖动、分享导出
+- **历史记录** — 按标题/备注/内容搜索，侧滑删除，批量清空
+
+## Android 版技术栈
+
+| 项 | 选型 |
+|---|---|
+| 语言 | Kotlin |
+| UI | Jetpack Compose + Material 3 |
+| 架构 | MVVM + Clean Architecture |
+| DI | Hilt |
+| 本地存储 | Room (SQLite) + DataStore |
+| 网络 | OkHttp（模型下载） |
+| 录音 | AudioRecord 16kHz/16bit/PCM |
+| 离线 ASR | Sherpa-ONNX JNI + SenseVoice (INT8/FP32 ONNX) |
+| 离线标点 | CT-Transformer ONNX（可选下载） |
+| VAD | Silero VAD ONNX（内置打包） |
+| 原生构建 | CMake + NDK (arm64-v8a) |
+
+## iOS 版技术栈
+
+| 项 | 选型 |
+|---|---|
+| 语言 | Swift 5 |
+| UI | SwiftUI（iOS 14 兼容） |
+| 架构 | MVVM + 手动 DI |
+| 本地存储 | Core Data + UserDefaults |
+| 录音 | AVAudioEngine 16kHz/16bit/PCM |
+| 离线 ASR | Sherpa-ONNX XCFramework + SenseVoice (INT8/FP32 ONNX) |
+| 离线标点 | CT-Transformer ONNX（可选下载） |
+
+## 快速开始
+
+### Android
+
+#### 1. 下载原生库
+
+首次构建前，必须先下载 sherpa-onnx Android 预编译原生库：
+
+```bash
+cd scripts
+./download_sherpa_onnx_android.sh
+```
+
+脚本会将 `libonnxruntime.so` 和 `libsherpa-onnx-c-api.so` 安装到 `android/app/src/main/jniLibs/<abi>/` 目录。
+
+#### 2. 检查预编译库是否就位
+
+```bash
+ls android/app/src/main/jniLibs/arm64-v8a/
+# 应包含: libonnxruntime.so  libsherpa-onnx-c-api.so
+```
+
+#### 3. 构建
+
+用 Android Studio 打开项目根目录，等待 Gradle Sync 完成后运行 App。
+
+或命令行构建：
+
+```bash
+cd android
+./gradlew assembleRelease
+```
+
+> **注意**: `android/app/src/main/cpp/CMakeLists.txt` 会在 CMake 配置阶段检查 `jniLibs/` 中的预编译库是否存在，不存在则跳过 JNI 桥接库的编译。如果下载脚本在 CMake 配置之后执行，CMake 缓存了 "库不存在" 的结果，需要清除缓存后重建。
+
+#### 4. 故障排除：清除 CMake 缓存
+
+如果 app 安装后提示 **"sherpa-onnx 原生库未安装"**，说明 CMake 构建时没有找到预编译库（通常是因为下载脚本在首次构建之后才执行）。
+
+**验证已打包的 native 库**（构建后检查 APK 是否包含所有必需的 .so）：
+
+```bash
+ls android/app/build/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/arm64-v8a/
+# 必须包含: libonnxruntime.so  libsherpa-onnx-c-api.so  libsherpa_onnx_jni.so
+```
+
+如果缺少 `libsherpa_onnx_jni.so`，执行以下步骤：
+
+```bash
+# 1. 确认预编译库已在 jniLibs 中
+ls android/app/src/main/jniLibs/arm64-v8a/
+
+# 2. 清除 CMake 缓存
+rm -rf android/app/.cxx
+
+# 3. 重新构建
+cd android && ./gradlew assembleRelease
+```
+
+#### 5. 安装
+
+```bash
+cd android
+./gradlew installRelease
+```
+
+### iOS
+
+#### GUI 方式
+
+1. 用 Xcode 打开 `ios/VoiceNote/VoiceNote.xcodeproj`（或 `ios/VoiceNote/VoiceNote.xcworkspace`）
+2. 选择目标设备（iOS 14.0+）
+3. 点击 Run（⌘R）运行 App
+4. 首次启动会提示下载/导入 SenseVoice 语音识别模型
+
+#### 命令行方式
+
+**模拟器**（无需额外工具，Xcode 14+ 均可使用）：
+
+```bash
+# 列出可用模拟器
+xcrun simctl list devices available
+
+# 构建
+xcodebuild -workspace ios/VoiceNote/VoiceNote.xcworkspace \
+  -scheme VoiceNote \
+  -configuration Debug \
+  -derivedDataPath ./build \
+  -destination 'platform=iOS Simulator,name=iPhone 14' \
+  build
+
+# 安装到模拟器
+xcrun simctl install "iPhone 14" build/Build/Products/Debug-iphonesimulator/VoiceNote.app
+
+# 启动 App
+xcrun simctl launch "iPhone 14" <bundle.id>
+```
+
+**真机**（需安装 `ios-deploy`）：
+
+```bash
+# 一次性安装 ios-deploy
+brew install ios-deploy
+
+# 构建（destination 填你的 iPhone 名称，可在 Xcode → Window → Devices and Simulators 查看）
+xcodebuild -workspace ios/VoiceNote/VoiceNote.xcworkspace \
+  -scheme VoiceNote \
+  -configuration Debug \
+  -derivedDataPath ./build \
+  -destination 'platform=iOS,name=你的iPhone名' \
+  build
+
+# 安装到真机（仅安装，不启动）
+ios-deploy --bundle build/Build/Products/Debug-iphoneos/VoiceNote.app --justlaunch=false
+
+# 安装并启动
+ios-deploy --bundle build/Build/Products/Debug-iphoneos/VoiceNote.app
+```
+
+> **Xcode 版本说明**：
+> - Xcode 14：使用 `ios-deploy` 安装到真机；`xcrun simctl` 用于模拟器
+> - Xcode 15+：可使用内置 `xcrun devicectl device install` 替代 `ios-deploy`（`devicectl` 在 Xcode 14 中不可用）
+
+## 配置
+
+首次使用在 App 内 **设置** 页面配置。
+
+### 通用配置（双平台）
+
+| 配置项 | 说明 | 默认值 |
+|---|---|---|
+| ASR 模型质量 | INT8 (~170MB) / FP32 (~860MB) | INT8 |
+| 标点符号模型 | 可选，用于给转写文本自动添加标点 | 未安装 |
+
+> 低内存设备（< 4GB RAM）不建议使用 FP32 模型。
+
+### 模型获取
+
+**ASR 模型**从 GitHub Releases 自动下载 `.tar.bz2` 归档并解压，也支持从本地文件导入（`.tar.bz2`、`.tar` 或 `.onnx` 文件）。
+
+**标点模型**从 GitHub Releases 下载，也支持从本地文件导入。
+
+| 模型 | 大小 | 下载地址 |
+|---|---|---|
+| ASR INT8 | ~170 MB | `https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09.tar.bz2` |
+| ASR FP32 | ~860 MB | `https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2025-09-09.tar.bz2` |
+| 标点模型 | ~1 MB | `https://github.com/k2-fsa/sherpa-onnx/releases/download/punctuation-models/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12.tar.bz2` |
+
+> Android 版 VAD 模型已内置在安装包中，无需额外下载。
+
+## 使用流程
+
+### iOS
+
+1. **首页** — 查看今日录音统计、最近录音列表
+2. **新建录音**（点击 ＋）— 直接开始录音，标题自动生成
+3. **录音中** — 界面顶部变红，显示脉冲红点 + 计时器，下方实时滚动显示离线语音转写文本
+4. **结束录音** — 点击红色按钮，自动保存音频和转写结果（含标点恢复，如已安装标点模型）
+5. **查看详情** — 两个 Tab 页切换：音频回放 / 完整转写，支持重新转写、导出分享
+6. **历史记录** — 按标题/备注搜索，左滑删除单条，右上角清空全部
+
+### Android
+
+1. **首页** — 查看今日录音统计、最近录音列表
+2. **新建录音**（点击 +）— 填写标题、备注、说话人（均可选），点击「开始录音」；或点击「导入音频」从本地选取音频文件
+3. **录音中** — 前台服务持续录音，界面实时显示语音转写文本
+4. **结束录音** — 自动保存音频和转写结果（含标点恢复，如已安装标点模型）
+5. **查看详情** — 两个 Tab 页切换：音频回放 / 完整转写，支持重新转写、导出分享
+6. **历史记录** — 按标题/备注/内容搜索，侧滑删除单条，右上角清空全部
+
+## iOS 项目结构
+
+```
+ios/VoiceNote/VoiceNote/
+├── VoiceNote.swift                     # App 入口 + 启动模型加载 + 导航
+├── Core/
+│   ├── ASR/
+│   │   ├── ASRTypes.swift              # 模型质量枚举
+│   │   ├── ASRModelManager.swift       # ASR 模型下载/导入/删除
+│   │   ├── OfflineASRClient.swift      # Sherpa-ONNX C API 客户端
+│   │   ├── OfflinePunctuationClient.swift # 标点模型 C API 客户端
+│   │   ├── PunctuationModelManager.swift # 标点模型下载/导入/删除
+│   │   └── Bzip2Helper.h              # bzip2 解压 C 桥接
+│   ├── Audio/
+│   │   ├── AudioCapture.swift          # AVAudioEngine PCM 采集
+│   │   └── AudioPlayer.swift           # 录音回放
+│   ├── Service/
+│   │   └── RecordingManager.swift      # 录音 + 离线 ASR + 标点编排
+│   ├── Database/
+│   │   └── PersistenceController.swift # Core Data
+│   ├── Location/
+│   └── DI/
+│       └── AppContainer.swift          # 手动依赖注入
+├── Domain/
+│   ├── Model/
+│   │   ├── Visit.swift                 # VoiceRecord 领域模型
+│   │   └── VisitSummary.swift          # 总结数据模型（规划中）
+│   └── Repository/
+│       └── VisitRepository.swift       # 数据仓库接口
+├── Data/
+│   └── Repository/
+│       └── VisitRepositoryImpl.swift   # Core Data 仓库实现
+└── UI/
+    ├── Home/                           # 首页仪表盘
+    ├── Recording/                      # 录音页（进入即开始）
+    ├── Detail/                         # 录音详情（音频 / 转写两个 Tab）
+    ├── History/                        # 历史记录
+    ├── Settings/                       # 设置（ASR 模型 + 标点模型）
+    └── Theme/                          # 主题常量
+```
+
+## Android 项目结构
+
+```
+app/src/main/java/com/voicenote/app/
+├── VoiceNoteApp.kt                    # Application
+├── MainActivity.kt                    # 入口 Activity
+├── core/
+│   ├── audio/
+│   │   ├── AudioCapture.kt            # AudioRecord PCM 采集
+│   │   ├── AudioFileManager.kt        # WAV 文件读写
+│   │   └── AudioImporter.kt           # 外部音频导入 + 后台 ASR
+│   ├── asr/
+│   │   ├── ASRMode.kt                 # ASR 模式枚举
+│   │   ├── ModelQuality.kt            # SenseVoice 模型精度（INT8/FP32）
+│   │   ├── OfflineASRClient.kt        # Sherpa-ONNX JNI 客户端（离线）
+│   │   └── ASRModelManager.kt         # 离线 ASR 模型下载/上传/删除
+│   ├── service/RecordingService.kt    # 前台服务（录音 + ASR 编排）
+│   ├── common/MemoryWarningBus.kt     # 内存警告事件总线
+│   ├── database/                      # Room 数据库（Entity / DAO）
+│   └── di/                            # Hilt 模块 + DataStore
+├── domain/
+│   ├── model/                         # VoiceRecord 领域模型
+│   └── repository/                    # Repository 接口
+├── data/repository/                   # Repository 实现
+└── ui/
+    ├── home/                          # 首页仪表盘
+    ├── recording/                     # 新建录音 + 实时转写 + 音频导入
+    ├── detail/                        # 录音详情（音频 / 转写两个 Tab）
+    ├── history/                       # 历史记录（搜索 + 侧滑删除）
+    ├── settings/                      # ASR 模型质量 + 模型管理
+    ├── navigation/                    # 路由
+    └── theme/                         # Material 3 主题
+```
+
+## 权限
+
+| 权限 | 用途 | 平台 |
+|---|---|---|
+| RECORD_AUDIO / 麦克风 | 录音 | Android / iOS |
+| INTERNET | 模型下载 | Android |
+| FOREGROUND_SERVICE | 前台服务运行 | Android |
+| WAKE_LOCK | 防止 CPU 休眠中断录音 | Android |
+
+## 数据模型
+
+```
+VoiceRecord:
+  id, title, memo, description, speakers,
+  startTime, endTime, audioFilePath, transcriptFilePath,
+  transcriptText, transcriptStatus (PENDING / PROCESSING / COMPLETED / UNAVAILABLE),
+  summary (RecordSummary), summaryStatus, summaryGeneratedAt  ← 预留字段，规划中
+
+RecordSummary:
+  topics, conclusions, todos (TodoItem), nextSteps
+
+TodoItem:
+  task, owner, deadline
+```
+
+## 最低要求
+
+- **Android** 8.0 (API 26)，离线 ASR 需 arm64-v8a 设备
+- **iOS** 14.0
