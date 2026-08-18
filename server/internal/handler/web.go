@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/zngp/server/config"
 	"github.com/zngp/server/internal/model"
 	"github.com/zngp/server/internal/store"
 )
@@ -92,6 +93,14 @@ func (h *WebHandler) RecordDetail(c *gin.Context) {
 		"record":     record,
 		"inspection": inspection,
 		"templates":  templates,
+	})
+}
+
+// UploadPage renders the manual audio upload page for admins
+func (h *WebHandler) UploadPage(c *gin.Context) {
+	c.HTML(http.StatusOK, "upload.html", gin.H{
+		"title":       "上传音频",
+		"max_size_mb": config.AppConfig.Upload.MaxFileSizeMB,
 	})
 }
 

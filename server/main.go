@@ -157,7 +157,12 @@ func main() {
 
 	// Web pages
 	r.GET("/login", webH.LoginPage)
+	r.GET("/logout", func(c *gin.Context) {
+		middleware.ClearTokenCookie(c)
+		c.Redirect(302, "/login")
+	})
 	r.GET("/", middleware.AuthWebRequired(), webH.Dashboard)
+	r.GET("/upload", middleware.AuthWebRequired(), webH.UploadPage)
 	r.GET("/records", middleware.AuthWebRequired(), webH.RecordsPage)
 	r.GET("/records/:id", middleware.AuthWebRequired(), webH.RecordDetail)
 	r.GET("/templates", middleware.AuthWebRequired(), webH.TemplatesPage)

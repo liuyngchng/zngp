@@ -53,6 +53,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// 浏览器登录：通过 Cookie 传递 token，同时返回 JSON 给 App 端
+	middleware.SetTokenCookie(c, token)
+
 	c.JSON(http.StatusOK, LoginResponse{
 		Token:    token,
 		Username: user.Username,

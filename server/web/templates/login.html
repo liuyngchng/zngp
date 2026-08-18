@@ -35,8 +35,7 @@
                     body: JSON.stringify({username, password})
                 });
                 if (resp.ok) {
-                    const data = await resp.json();
-                    localStorage.setItem('token', data.token);
+                    // 服务端已通过 Set-Cookie 写入 token，直接跳转
                     window.location.href = '/';
                 } else {
                     const data = await resp.json();

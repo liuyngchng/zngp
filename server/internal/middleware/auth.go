@@ -15,6 +15,8 @@ var (
 	ErrTokenExpired = jwt.ErrTokenExpired
 )
 
+const CookieName = "zngp_token"
+
 type Claims struct {
 	UserID   int64  `json:"user_id"`
 	Username string `json:"username"`
@@ -30,7 +32,6 @@ func GenerateToken(userID int64, username string) (string, error) {
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
-
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(config.AppConfig.Auth.JWTSecret))
 }
@@ -48,23 +49,45 @@ func ParseToken(tokenString string) (*Claims, error) {
 	return nil, ErrTokenInvalid
 }
 
-// AuthRequired extracts the JWT token, and on success,
-// issues a refreshed token (sliding expiration) in the X-New-Token response header.
+// SetTokenCookie writes the JWT token as an HttpOnly cookie
+func SetTokenCookie(c *gin.Context, token string) {
+	c.SetCookie(CookieName, token, 72*3600, "/", "", false, true)
+}
+
+// ClearTokenCookie removes the auth cookie
+func ClearTokenCookie(c *gin.Context) {
+	c.SetCookie(CookieName, "", -1, "/", "", false, true)
+}
+
+// extractToken tries to get the JWT from Authorization header, then Cookie
+func extractToken(c *gin.Context) string {
+	// Header first (for API calls from App)
+	header := c.GetHeader("Authorization")
+	if header != "" {
+		parts := strings.SplitN(header, " ", 2)
+		if len(parts) == 2 && parts[0] == "Bearer" {
+			return parts[1]
+		}
+	}
+	// Cookie second (for Web browser)
+	if cookie, err := c.Cookie(CookieName); err == nil && cookie != "" {
+		return cookie
+	}
+	return ""
+}
+
+// AuthRequired extracts the JWT token from Header or Cookie.
+// On success, issues a refreshed token (sliding expiration)
+// in both X-New-Token header and Set-Cookie.
 func AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		header := c.GetHeader("Authorization")
-		if header == "" {
+		tokenStr := extractToken(c)
+		if tokenStr == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
 			return
 		}
 
-		parts := strings.SplitN(header, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization format"})
-			return
-		}
-
-		claims, err := ParseToken(parts[1])
+		claims, err := ParseToken(tokenStr)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 			return
@@ -73,37 +96,41 @@ func AuthRequired() gin.HandlerFunc {
 		c.Set("user_id", claims.UserID)
 		c.Set("username", claims.Username)
 
-		// 滑动续期：每次请求都签发新 token，有效期重置为 72 小时
-		newToken, err := GenerateToken(claims.UserID, claims.Username)
-		if err == nil {
-			c.Header("X-New-Token", newToken)
-		}
+		// 滑动续期
+		newToken, _ := GenerateToken(claims.UserID, claims.Username)
+		c.Header("X-New-Token", newToken)
+		SetTokenCookie(c, newToken)
 
 		c.Next()
 	}
 }
 
-// AuthWebRequired is a web-page version: redirects to /login if not authenticated
+// AuthWebRequired redirects to /login if not authenticated.
+// Supports both Cookie (browser) and Header (JS fetch) auth.
 func AuthWebRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		header := c.GetHeader("Authorization")
-		if header != "" {
-			parts := strings.SplitN(header, " ", 2)
-			if len(parts) == 2 && parts[0] == "Bearer" {
-				claims, err := ParseToken(parts[1])
-				if err == nil {
-					c.Set("user_id", claims.UserID)
-					c.Set("username", claims.Username)
-
-					// 滑动续期
-					newToken, _ := GenerateToken(claims.UserID, claims.Username)
-					c.Header("X-New-Token", newToken)
-
-					c.Next()
-					return
-				}
-			}
+		tokenStr := extractToken(c)
+		if tokenStr == "" {
+			c.Redirect(http.StatusFound, "/login")
+			c.Abort()
+			return
 		}
+
+		claims, err := ParseToken(tokenStr)
+		if err != nil {
+			ClearTokenCookie(c)
+			c.Redirect(http.StatusFound, "/login")
+			c.Abort()
+			return
+		}
+
+		c.Set("user_id", claims.UserID)
+		c.Set("username", claims.Username)
+
+		// 滑动续期
+		newToken, _ := GenerateToken(claims.UserID, claims.Username)
+		SetTokenCookie(c, newToken)
+
 		c.Next()
 	}
 }

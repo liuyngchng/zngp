@@ -13,10 +13,11 @@
             <a href="/" class="nav-brand">ZNGP 服务质量平台</a>
             <div class="nav-links">
                 <a href="/" class="nav-link">仪表盘</a>
+                <a href="/upload" class="nav-link">上传</a>
                 <a href="/records" class="nav-link">记录</a>
                 <a href="/templates" class="nav-link">模板</a>
                 <a href="/config" class="nav-link">配置</a>
-                <a href="#" onclick="doLogout()" class="nav-link nav-link-danger">退出</a>
+                <a href="/logout" class="nav-link nav-link-danger">退出</a>
             </div>
         </div>
     </nav>
@@ -24,20 +25,13 @@
         {{template "content" .}}
     </main>
     <script>
-        function doLogout() { localStorage.removeItem('token'); window.location.href = '/login'; }
-        document.addEventListener('DOMContentLoaded', function() {
-            const token = localStorage.getItem('token');
-            if (!token && !window.location.pathname.startsWith('/login')) {
-                window.location.href = '/login';
-            }
-        });
+        // 认证已由 Cookie 处理，API 请求自动携带 Cookie
         function apiFetch(url, options) {
-            const token = localStorage.getItem('token');
             const opts = options || {};
             opts.headers = Object.assign({}, opts.headers || {}, {
-                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
             });
+            opts.credentials = 'same-origin';
             return fetch(url, opts);
         }
     </script>
