@@ -1,0 +1,45 @@
+{{define "content"}}
+<div class="page-header">
+    <h1>检查项模板</h1>
+</div>
+
+<div class="section">
+    {{range .templates}}
+    <div class="template-card">
+        <div class="template-header">
+            <h3>{{.Name}}</h3>
+            <span class="badge badge-blue">{{.Category}}</span>
+        </div>
+        <p class="template-desc">{{.Description}}</p>
+        <div class="template-items">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width:60px">序号</th>
+                        <th>检查项</th>
+                        <th>分类</th>
+                        <th>必检</th>
+                        <th>权重</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Items}}
+                    <tr>
+                        <td>{{.ItemNumber}}</td>
+                        <td><strong>{{.Name}}</strong>{{if .Description}}<br><small>{{.Description}}</small>{{end}}</td>
+                        <td>{{.Category}}</td>
+                        <td>{{if .IsRequired}}✓{{else}}-{{end}}</td>
+                        <td>{{.Weight}}</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        <a href="/templates/{{.ID}}/edit" class="btn btn-outline">编辑</a>
+    </div>
+    {{else}}
+    <div class="empty-state">暂无模板</div>
+    {{end}}
+</div>
+{{end}}
+{{template "layout" .}}

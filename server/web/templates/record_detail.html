@@ -1,0 +1,147 @@
+{{define "content"}}
+<div class="page-header">
+    <h1>记录详情</h1>
+    <a href="/records" class="btn btn-outline">返回列表</a>
+</div>
+
+<div class="detail-grid">
+    <div class="detail-section">
+        <h2>基本信息</h2>
+        <dl class="detail-list">
+            <dt>客户姓名</dt><dd>{{.record.CustomerName}}</dd>
+            <dt>安检员</dt><dd>{{.record.InspectorName}}</dd>
+            <dt>客户地址</dt><dd>{{.record.CustomerAddress}}</dd>
+            <dt>安检日期</dt><dd>{{.record.InspectionDate.Format "2006-01-02 15:04"}}</dd>
+            <dt>音频时长</dt><dd>{{printf "%.0f" .record.AudioDuration}} 秒</dd>
+        </dl>
+
+        <h3>音频播放</h3>
+        <audio controls class="audio-player" id="audioPlayer">
+            <source src="/api/records/{{.record.ID}}/audio" type="audio/wav">
+            您的浏览器不支持音频播放
+        </audio>
+
+        <h3>转写文本</h3>
+        {{if .record.TranscriptText}}
+        <div class="transcript-text">{{.record.TranscriptText}}</div>
+        {{else}}
+        <div class="empty-state">
+            <p>尚未转写</p>
+            <button class="btn btn-primary" onclick="transcribeRecord('{{.record.ID}}')">开始转写</button>
+        </div>
+        {{end}}
+    </div>
+
+    <div class="detail-section">
+        <h2>AI 质检</h2>
+        {{if .inspection}}
+        <div class="inspection-summary">
+            <div class="conclusion conclusion-{{conclusionClass .inspection.OverallConclusion}}">
+                结论：{{.inspection.OverallConclusion}}
+            </div>
+            <div class="score">综合评分：{{.inspection.OverallScore}} 分</div>
+            <div class="inspection-summary-text">{{.inspection.Summary}}</div>
+        </div>
+
+        <h3>逐项检查结果</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>检查项</th>
+                    <th>判定</th>
+                    <th>置信度</th>
+                    <th>证据</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .inspection.Items}}
+                <tr>
+                    <td>{{.ItemName}}</td>
+                    <td><span class="badge badge-{{verdictClass .Verdict}}">{{.Verdict}}</span></td>
+                    <td>{{printf "%.0f%%" (mul .Confidence 100)}}</td>
+                    <td class="evidence-text">{{.Evidence}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <div class="empty-state">
+            <p>尚未质检</p>
+            {{if .record.TranscriptText}}
+            <form onsubmit="inspectRecord(event, '{{.record.ID}}')">
+                <div class="form-group">
+                    <label for="templateSelect">选择检查项模板</label>
+                    <select id="templateSelect" class="form-select">
+                        {{range .templates}}
+                        <option value="{{.ID}}">{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">开始质检</button>
+            </form>
+            {{else}}
+            <p class="text-muted">请先完成转写</p>
+            {{end}}
+        </div>
+        {{end}}
+    </div>
+</div>
+
+<script>
+    async function transcribeRecord(id) {
+        if (!confirm('确认开始转写？')) return;
+        try {
+            const resp = await apiFetch('/api/records/' + id + '/transcribe', {method: 'POST'});
+            if (resp.ok) {
+                alert('转写完成，正在刷新...');
+                window.location.reload();
+            } else {
+                const data = await resp.json();
+                alert('转写失败: ' + (data.error || '未知错误'));
+            }
+        } catch (err) {
+            alert('转写失败: ' + err.message);
+        }
+    }
+
+    async function inspectRecord(e, id) {
+        e.preventDefault();
+        const templateId = document.getElementById('templateSelect').value;
+        if (!templateId) { alert('请选择模板'); return; }
+        if (!confirm('确认开始 AI 质检？')) return;
+        try {
+            const resp = await apiFetch('/api/records/' + id + '/inspect', {
+                method: 'POST',
+                body: JSON.stringify({template_id: parseInt(templateId)})
+            });
+            if (resp.ok) {
+                alert('质检完成，正在刷新...');
+                window.location.reload();
+            } else {
+                const data = await resp.json();
+                alert('质检失败: ' + (data.error || '未知错误'));
+            }
+        } catch (err) {
+            alert('质检失败: ' + err.message);
+        }
+    }
+
+    // 音频播放鉴权：audio 标签不能直接带 header，改用 fetch 加载
+    document.addEventListener('DOMContentLoaded', function() {
+        const audio = document.getElementById('audioPlayer');
+        if (audio) {
+            const token = localStorage.getItem('token');
+            fetch('/api/records/{{.record.ID}}/audio', {
+                headers: {'Authorization': 'Bearer ' + token}
+            }).then(resp => {
+                if (resp.ok) return resp.blob();
+                throw new Error('加载音频失败');
+            }).then(blob => {
+                audio.src = URL.createObjectURL(blob);
+            }).catch(err => {
+                console.error(err);
+            });
+        }
+    });
+</script>
+{{end}}{{template "layout" .}}

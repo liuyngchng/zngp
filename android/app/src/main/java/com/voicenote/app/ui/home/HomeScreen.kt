@@ -49,7 +49,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.voicenote.app.core.asr.ModelStatus
 import com.voicenote.app.domain.model.VoiceRecord
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -64,12 +63,6 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-
-    // Refresh model status each time the screen enters composition,
-    // picking up changes made on other screens (e.g. model upload in Settings).
-    LaunchedEffect(Unit) {
-        viewModel.refreshModelStatus()
-    }
 
     Scaffold(
         topBar = {
@@ -96,23 +89,17 @@ fun HomeScreen(
                             modifier = Modifier.size(28.dp)
                         )
                     }
-                    // "+" button — primary action, matches iOS toolbar pattern
-                    // Disabled until the voice model is fully loaded
-                    val isModelReady = uiState.modelStatus == ModelStatus.READY
+                    // "+" button — primary action
                     Surface(
-                        onClick = { if (isModelReady) onStartRecording() },
+                        onClick = onStartRecording,
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(
-                            alpha = if (isModelReady) 0.15f else 0.05f
-                        ),
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.15f),
                         modifier = Modifier.padding(end = 8.dp)
                     ) {
                         Icon(
                             Icons.Default.Add,
                             contentDescription = "新建录音",
-                            tint = MaterialTheme.colorScheme.onPrimary.copy(
-                                alpha = if (isModelReady) 1.0f else 0.3f
-                            ),
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(44.dp).padding(10.dp)
                         )
                     }
@@ -147,25 +134,6 @@ fun HomeScreen(
                             title = "总记录",
                             value = "${uiState.totalRecordCount}"
                         )
-                    }
-                }
-
-                // Model status banner
-                item {
-                    when (uiState.modelStatus) {
-                        ModelStatus.UNKNOWN, ModelStatus.LOADING -> {
-                            ModelLoadingBanner()
-                        }
-                        ModelStatus.MISSING -> {
-                            ModelMissingBanner(onGoToSettings = onSettingsClick)
-                        }
-                        ModelStatus.NATIVE_MISSING -> {
-                            NativeMissingBanner()
-                        }
-                        ModelStatus.ERROR -> {
-                            ModelErrorBanner(onGoToSettings = onSettingsClick)
-                        }
-                        ModelStatus.READY -> { /* no banner needed */ }
                     }
                 }
 
@@ -223,158 +191,6 @@ private fun StatCard(modifier: Modifier = Modifier, title: String, value: String
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
-
-@Composable
-private fun ModelMissingBanner(onGoToSettings: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                Icons.Default.Warning,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "离线模型未安装",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-            TextButton(onClick = onGoToSettings) {
-                Icon(
-                    Icons.Default.Download,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("前往设置")
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModelErrorBanner(onGoToSettings: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                Icons.Default.Error,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "模型加载失败",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-                Text(
-                    "模型文件可能已损坏，请重新下载或上传",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
-                )
-            }
-            TextButton(onClick = onGoToSettings) {
-                Icon(
-                    Icons.Default.Download,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("前往设置")
-            }
-        }
-    }
-}
-
-@Composable
-private fun NativeMissingBanner() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                Icons.Default.Error,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "原生语音框架缺失",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-                Text(
-                    "sherpa-onnx 原生库未安装，离线语音识别不可用。请确保已运行下载脚本获取原生库。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModelLoadingBanner() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(18.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                "正在加载语音识别模型...",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
             )
         }
     }

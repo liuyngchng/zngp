@@ -92,7 +92,6 @@ class RecordingViewModel @Inject constructor(
         val intent = Intent(context, RecordingService::class.java).apply {
             action = RecordingService.ACTION_START
             putExtra(RecordingService.EXTRA_RECORD_ID, recordId)
-            putExtra(RecordingService.EXTRA_OFFLINE_MODEL_QUALITY, settings.offlineModelQuality)
         }
         try {
             context.startForegroundService(intent)
@@ -167,11 +166,6 @@ class RecordingViewModel @Inject constructor(
     }
 
     private fun observeServiceState() {
-        viewModelScope.launch {
-            RecordingService.transcriptState.collect { text ->
-                _uiState.value = _uiState.value.copy(transcript = text)
-            }
-        }
         viewModelScope.launch {
             RecordingService.durationSeconds.collect { seconds ->
                 _uiState.value = _uiState.value.copy(durationSeconds = seconds)

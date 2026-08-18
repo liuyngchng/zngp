@@ -37,17 +37,6 @@ android {
         versionCode = 1
         versionName = "2.0.0"
         buildConfigField("String", "BUILD_TIMESTAMP", "\"${buildTimestamp}\"")
-
-        ndk {
-            abiFilters += listOf("arm64-v8a")
-        }
-
-        externalNativeBuild {
-            cmake {
-                cppFlags("-O3", "-DNDEBUG")
-                cFlags("-O3", "-DNDEBUG")
-            }
-        }
     }
 
     buildTypes {
@@ -74,13 +63,6 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-    }
-
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
-        }
     }
 }
 
@@ -124,7 +106,4 @@ dependencies {
 
     // Core
     implementation(libs.core.ktx)
-
-    // Commons Compress (tar.bz2 extraction for model downloads)
-    implementation(libs.commons.compress)
 }

@@ -1,0 +1,46 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.title}} - ZNGP 服务质量平台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-brand">ZNGP 服务质量平台</a>
+            <div class="nav-links">
+                <a href="/" class="nav-link">仪表盘</a>
+                <a href="/records" class="nav-link">记录</a>
+                <a href="/templates" class="nav-link">模板</a>
+                <a href="/config" class="nav-link">配置</a>
+                <a href="#" onclick="doLogout()" class="nav-link nav-link-danger">退出</a>
+            </div>
+        </div>
+    </nav>
+    <main class="main-content">
+        {{template "content" .}}
+    </main>
+    <script>
+        function doLogout() { localStorage.removeItem('token'); window.location.href = '/login'; }
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = localStorage.getItem('token');
+            if (!token && !window.location.pathname.startsWith('/login')) {
+                window.location.href = '/login';
+            }
+        });
+        function apiFetch(url, options) {
+            const token = localStorage.getItem('token');
+            const opts = options || {};
+            opts.headers = Object.assign({}, opts.headers || {}, {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            });
+            return fetch(url, opts);
+        }
+    </script>
+</body>
+</html>
+{{end}}

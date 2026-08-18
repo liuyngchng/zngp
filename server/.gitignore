@@ -1,0 +1,15 @@
+# Binaries
+server
+*.exe
+
+# Data
+data/
+*.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Go
+vendor/

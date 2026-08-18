@@ -1,0 +1,66 @@
+{{define "content"}}
+<div class="page-header">
+    <h1>仪表盘</h1>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-number">{{.total_records}}</div>
+        <div class="stat-label">总记录数</div>
+    </div>
+    <div class="stat-card stat-card-green">
+        <div class="stat-number">{{.compliant_count}}</div>
+        <div class="stat-label">合规</div>
+    </div>
+    <div class="stat-card stat-card-red">
+        <div class="stat-number">{{.non_compliant}}</div>
+        <div class="stat-label">不合规</div>
+    </div>
+    <div class="stat-card stat-card-yellow">
+        <div class="stat-number">{{.review_count}}</div>
+        <div class="stat-label">需复核</div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>最近记录</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>客户</th>
+                <th>安检员</th>
+                <th>日期</th>
+                <th>转写状态</th>
+                <th>质检结果</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .recent_records}}
+            <tr>
+                <td>{{.CustomerName}}</td>
+                <td>{{.InspectorName}}</td>
+                <td>{{.InspectionDate.Format "2006-01-02"}}</td>
+                <td>
+                    <span class="badge badge-{{transcriptStatusClass .TranscriptStatus}}">{{.TranscriptStatus}}</span>
+                </td>
+                <td>
+                    {{if eq .InspectionStatus "COMPLETED"}}
+                        <a href="/records/{{.ID}}">查看</a>
+                    {{else if eq .InspectionStatus "NONE"}}
+                        <span class="badge badge-gray">未质检</span>
+                    {{else}}
+                        <span class="badge badge-blue">{{.InspectionStatus}}</span>
+                    {{end}}
+                </td>
+                <td>
+                    <a href="/records/{{.ID}}" class="btn btn-sm btn-outline">详情</a>
+                </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="6" class="text-center">暂无记录</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}{{template "layout" .}}

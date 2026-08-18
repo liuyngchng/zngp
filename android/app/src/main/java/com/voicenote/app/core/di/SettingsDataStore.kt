@@ -15,11 +15,9 @@ import javax.inject.Singleton
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
 data class AppSettings(
-    val offlineModelQuality: String = "int8",
-    // 在线 LLM 配置
-    val llmApiEndpoint: String = "https://api.deepseek.com",
-    val llmApiKey: String = "",
-    val llmModelName: String = "deepseek-v4-flash"
+    // 服务器配置
+    val serverUrl: String = "http://192.168.1.1:8080",
+    val serverApiKey: String = ""
 )
 
 @Singleton
@@ -27,30 +25,21 @@ class SettingsDataStore @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private object Keys {
-        val OFFLINE_MODEL_QUALITY = stringPreferencesKey("offline_model_quality")
-        val LLM_API_ENDPOINT = stringPreferencesKey("llm_api_endpoint")
-        val LLM_API_KEY = stringPreferencesKey("llm_api_key")
-        val LLM_MODEL_NAME = stringPreferencesKey("llm_model_name")
+        val SERVER_URL = stringPreferencesKey("server_url")
+        val SERVER_API_KEY = stringPreferencesKey("server_api_key")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { prefs ->
         AppSettings(
-            offlineModelQuality = prefs[Keys.OFFLINE_MODEL_QUALITY] ?: "int8",
-            llmApiEndpoint = prefs[Keys.LLM_API_ENDPOINT] ?: "https://api.deepseek.com",
-            llmApiKey = prefs[Keys.LLM_API_KEY] ?: "",
-            llmModelName = prefs[Keys.LLM_MODEL_NAME] ?: "deepseek-v4-flash"
+            serverUrl = prefs[Keys.SERVER_URL] ?: "http://192.168.1.1:8080",
+            serverApiKey = prefs[Keys.SERVER_API_KEY] ?: ""
         )
     }
 
-    suspend fun updateOfflineModelQuality(quality: String) {
-        context.dataStore.edit { it[Keys.OFFLINE_MODEL_QUALITY] = quality }
-    }
-
-    suspend fun updateLLMConfig(endpoint: String, apiKey: String, modelName: String) {
+    suspend fun updateServerConfig(url: String, apiKey: String) {
         context.dataStore.edit {
-            it[Keys.LLM_API_ENDPOINT] = endpoint
-            it[Keys.LLM_API_KEY] = apiKey
-            it[Keys.LLM_MODEL_NAME] = modelName
+            it[Keys.SERVER_URL] = url
+            it[Keys.SERVER_API_KEY] = apiKey
         }
     }
 }
