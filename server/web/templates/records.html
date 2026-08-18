@@ -1,10 +1,13 @@
 {{define "content_records"}}
 <div class="page-header">
-    <h1>记录列表</h1>
-    <form method="GET" action="/records" class="search-form">
-        <input type="text" name="keyword" value="{{.keyword}}" placeholder="搜索客户、安检员、标题..." class="search-input">
-        <button type="submit" class="btn btn-primary">搜索</button>
-    </form>
+    <h1><i class="fas fa-list-alt"></i> 记录列表</h1>
+    <div style="display:flex;gap:12px;align-items:center;">
+        <form method="GET" action="/records" class="search-form">
+            <input type="text" name="keyword" value="{{.keyword}}" placeholder="搜索客户、安检员、标题..." class="search-input">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> 搜索</button>
+        </form>
+        <a href="/upload" class="btn btn-primary"><i class="fas fa-cloud-upload-alt"></i> 上传</a>
+    </div>
 </div>
 
 <div class="section">
@@ -32,11 +35,14 @@
                 <td><span class="badge badge-{{transcriptStatusClass .TranscriptStatus}}">{{.TranscriptStatus}}</span></td>
                 <td><span class="badge badge-{{inspectionStatusClass .InspectionStatus}}">{{.InspectionStatus}}</span></td>
                 <td>
-                    <a href="/records/{{.ID}}" class="btn btn-sm btn-outline">详情</a>
+                    <a href="/records/{{.ID}}" class="btn btn-sm btn-outline"><i class="fas fa-arrow-right"></i> 详情</a>
                 </td>
             </tr>
             {{else}}
-            <tr><td colspan="8" class="text-center">暂无记录</td></tr>
+            <tr><td colspan="8" class="text-center" style="padding:32px;">
+                <i class="fas fa-inbox" style="font-size:2rem;color:#d0d5dd;display:block;margin-bottom:8px;"></i>
+                暂无记录
+            </td></tr>
             {{end}}
         </tbody>
     </table>
@@ -44,11 +50,11 @@
     {{if gt .total_pages 1}}
     <div class="pagination">
         {{if gt .page 1}}
-        <a href="/records?page={{sub .page 1}}&keyword={{.keyword}}" class="btn btn-sm">上一页</a>
+        <a href="/records?page={{sub .page 1}}&keyword={{.keyword}}" class="btn btn-outline"><i class="fas fa-chevron-left"></i> 上一页</a>
         {{end}}
         <span>第 {{.page}} / {{.total_pages}} 页（共 {{.total}} 条）</span>
         {{if lt .page .total_pages}}
-        <a href="/records?page={{add .page 1}}&keyword={{.keyword}}" class="btn btn-sm">下一页</a>
+        <a href="/records?page={{add .page 1}}&keyword={{.keyword}}" class="btn btn-outline">下一页 <i class="fas fa-chevron-right"></i></a>
         {{end}}
     </div>
     {{end}}

@@ -1,12 +1,12 @@
 {{define "content_record_detail"}}
 <div class="page-header">
-    <h1>记录详情</h1>
-    <a href="/records" class="btn btn-outline">返回列表</a>
+    <h1><i class="fas fa-file-audio"></i> 记录详情</h1>
+    <a href="/records" class="btn btn-outline"><i class="fas fa-arrow-left"></i> 返回列表</a>
 </div>
 
 <div class="detail-grid">
     <div class="detail-section">
-        <h2>基本信息</h2>
+        <h2><i class="fas fa-info-circle"></i> 基本信息</h2>
         <dl class="detail-list">
             <dt>客户姓名</dt><dd>{{.record.CustomerName}}</dd>
             <dt>安检员</dt><dd>{{.record.InspectorName}}</dd>
@@ -15,33 +15,34 @@
             <dt>音频时长</dt><dd>{{printf "%.0f" .record.AudioDuration}} 秒</dd>
         </dl>
 
-        <h3>音频播放</h3>
+        <h3><i class="fas fa-play-circle"></i> 音频播放</h3>
         <audio controls class="audio-player" id="audioPlayer" preload="none">
         </audio>
 
-        <h3>转写文本</h3>
+        <h3><i class="fas fa-file-alt"></i> 转写文本</h3>
         {{if .record.TranscriptText}}
         <div class="transcript-text">{{.record.TranscriptText}}</div>
         {{else}}
         <div class="empty-state">
+            <i class="fas fa-spinner fa-pulse"></i>
             <p>尚未转写</p>
-            <button class="btn btn-primary" onclick="transcribeRecord('{{.record.ID}}')">开始转写</button>
+            <button class="btn btn-primary" onclick="transcribeRecord('{{.record.ID}}')"><i class="fas fa-play"></i> 开始转写</button>
         </div>
         {{end}}
     </div>
 
     <div class="detail-section">
-        <h2>AI 质检</h2>
+        <h2><i class="fas fa-robot"></i> AI 质检</h2>
         {{if .inspection}}
         <div class="inspection-summary">
             <div class="conclusion conclusion-{{conclusionClass .inspection.OverallConclusion}}">
-                结论：{{.inspection.OverallConclusion}}
+                <i class="fas fa-gavel"></i> 结论：{{.inspection.OverallConclusion}}
             </div>
-            <div class="score">综合评分：{{.inspection.OverallScore}} 分</div>
+            <div class="score"><i class="fas fa-chart-bar"></i> 综合评分：{{.inspection.OverallScore}} 分</div>
             <div class="inspection-summary-text">{{.inspection.Summary}}</div>
         </div>
 
-        <h3>逐项检查结果</h3>
+        <h3><i class="fas fa-list-ul"></i> 逐项检查结果</h3>
         <table class="table">
             <thead>
                 <tr>
@@ -64,21 +65,22 @@
         </table>
         {{else}}
         <div class="empty-state">
+            <i class="fas fa-robot"></i>
             <p>尚未质检</p>
             {{if .record.TranscriptText}}
             <form onsubmit="inspectRecord(event, '{{.record.ID}}')">
                 <div class="form-group">
-                    <label for="templateSelect">选择检查项模板</label>
+                    <label for="templateSelect"><i class="fas fa-clipboard-check"></i> 选择检查项模板</label>
                     <select id="templateSelect" class="form-select">
                         {{range .templates}}
                         <option value="{{.ID}}">{{.Name}}</option>
                         {{end}}
                     </select>
                 </div>
-                <button type="submit" class="btn btn-primary">开始质检</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-robot"></i> 开始质检</button>
             </form>
             {{else}}
-            <p class="text-muted">请先完成转写</p>
+            <p class="text-muted"><i class="fas fa-info-circle"></i> 请先完成转写</p>
             {{end}}
         </div>
         {{end}}

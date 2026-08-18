@@ -1,13 +1,13 @@
 {{define "content_templates"}}
 <div class="page-header">
-    <h1>检查项模板</h1>
+    <h1><i class="fas fa-clipboard-check"></i> 检查项模板</h1>
 </div>
 
 <div class="section">
     {{range .templates}}
     <div class="template-card">
         <div class="template-header">
-            <h3>{{.Name}}</h3>
+            <h3><i class="fas fa-clipboard-list"></i> {{.Name}}</h3>
             <span class="badge badge-blue">{{.Category}}</span>
         </div>
         <p class="template-desc">{{.Description}}</p>
@@ -26,19 +26,22 @@
                     {{range .Items}}
                     <tr>
                         <td>{{.ItemNumber}}</td>
-                        <td><strong>{{.Name}}</strong>{{if .Description}}<br><small>{{.Description}}</small>{{end}}</td>
+                        <td><strong>{{.Name}}</strong>{{if .Description}}<br><small class="text-muted">{{.Description}}</small>{{end}}</td>
                         <td>{{.Category}}</td>
-                        <td>{{if .IsRequired}}✓{{else}}-{{end}}</td>
+                        <td>{{if .IsRequired}}<i class="fas fa-check" style="color:var(--green)"></i>{{else}}<i class="fas fa-minus" style="color:var(--gray)"></i>{{end}}</td>
                         <td>{{.Weight}}</td>
                     </tr>
                     {{end}}
                 </tbody>
             </table>
         </div>
-        <a href="/templates/{{.ID}}/edit" class="btn btn-outline">编辑</a>
+        <a href="/templates/{{.ID}}/edit" class="btn btn-outline"><i class="fas fa-edit"></i> 编辑</a>
     </div>
     {{else}}
-    <div class="empty-state">暂无模板</div>
+    <div class="empty-state">
+        <i class="fas fa-clipboard"></i>
+        <p>暂无模板</p>
+    </div>
     {{end}}
 </div>
 {{end}}

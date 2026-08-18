@@ -3,31 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登录 - ZNGP 服务质量平台</title>
+    <link rel="stylesheet" href="/static/lib/font-awesome.all.min.css">
     <link rel="stylesheet" href="/static/css/style.css">
+    <title>登录 - ZNGP 服务质量平台</title>
 </head>
-<body class="login-page">
-    <div class="login-card">
-        <h1 class="login-title">ZNGP 服务质量平台</h1>
-        <form id="loginForm" onsubmit="doLogin(event)">
-            <div class="form-group">
-                <label for="username">用户名</label>
-                <input type="text" id="username" name="username" required placeholder="请输入用户名" autocomplete="username">
+<body>
+    <div class="login-wrapper">
+        <div class="login-card">
+            <div class="login-header">
+                <i class="fas fa-microphone-alt"></i>
+                <h1>ZNGP 服务质量平台</h1>
+                <p>燃气入户安检 · 客户拜访合规质检</p>
             </div>
-            <div class="form-group">
-                <label for="password">密码</label>
-                <input type="password" id="password" name="password" required placeholder="请输入密码" autocomplete="current-password">
+
+            <div class="login-error" id="loginError" style="display:none;">
+                <i class="fas fa-exclamation-circle"></i> <span id="loginErrorMsg"></span>
             </div>
-            <div id="loginError" class="error-message" style="display:none"></div>
-            <button type="submit" class="btn btn-primary btn-full">登录</button>
-        </form>
+
+            <form id="loginForm" class="login-form">
+                <div class="login-field">
+                    <label><i class="fas fa-user"></i> 用户名</label>
+                    <input type="text" id="username" name="username" required placeholder="请输入用户名" autocomplete="username">
+                </div>
+                <div class="login-field">
+                    <label><i class="fas fa-lock"></i> 密码</label>
+                    <input type="password" id="password" name="password" required placeholder="请输入密码" autocomplete="current-password">
+                </div>
+                <button type="submit" class="login-btn">
+                    <i class="fas fa-sign-in-alt"></i> 登 录
+                </button>
+            </form>
+
+            <div class="login-footer">
+                <p>ZNGP 服务质量平台 · 语音质检管理系统</p>
+            </div>
+        </div>
     </div>
+
     <script>
         async function doLogin(e) {
             e.preventDefault();
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             const errEl = document.getElementById('loginError');
+            const errMsg = document.getElementById('loginErrorMsg');
             try {
                 const resp = await fetch('/api/auth/login', {
                     method: 'POST',
@@ -39,14 +58,15 @@
                     window.location.href = '/';
                 } else {
                     const data = await resp.json();
-                    errEl.textContent = data.error || '登录失败';
-                    errEl.style.display = 'block';
+                    errMsg.textContent = data.error || '登录失败';
+                    errEl.style.display = 'flex';
                 }
             } catch (err) {
-                errEl.textContent = '网络错误，请检查服务器连接';
-                errEl.style.display = 'block';
+                errMsg.textContent = '网络错误，请检查服务器连接';
+                errEl.style.display = 'flex';
             }
         }
+        document.getElementById('loginForm').addEventListener('submit', doLogin);
     </script>
 </body>
 </html>
