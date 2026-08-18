@@ -148,21 +148,32 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // API Key
-                    var apiKeyVisible by remember { mutableStateOf(false) }
+                    // 用户名
                     OutlinedTextField(
-                        value = uiState.serverApiKey,
-                        onValueChange = viewModel::updateServerApiKey,
-                        label = { Text("访问令牌 (Token)") },
-                        placeholder = { Text("登录服务器后获取的 token") },
+                        value = uiState.username,
+                        onValueChange = viewModel::updateUsername,
+                        label = { Text("用户名") },
+                        placeholder = { Text("admin") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // 密码
+                    var passwordVisible by remember { mutableStateOf(false) }
+                    OutlinedTextField(
+                        value = uiState.password,
+                        onValueChange = viewModel::updatePassword,
+                        label = { Text("密码") },
+                        placeholder = { Text("请输入密码") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        visualTransformation = if (apiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = {
-                            IconButton(onClick = { apiKeyVisible = !apiKeyVisible }) {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
-                                    imageVector = if (apiKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = if (apiKeyVisible) "隐藏令牌" else "显示令牌"
+                                    imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (passwordVisible) "隐藏密码" else "显示密码"
                                 )
                             }
                         }

@@ -134,7 +134,7 @@ class DetailViewModel @Inject constructor(
 
             try {
                 val settings = settingsDataStore.settingsFlow.first()
-                val client = ServerClient(settings.serverUrl, settings.serverApiKey)
+                val client = ServerClient(settings.serverUrl, settings.username, settings.password)
 
                 val metadata = UploadMetadata(
                     id = record.id.toString(),

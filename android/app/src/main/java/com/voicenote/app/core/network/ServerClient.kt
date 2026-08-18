@@ -49,29 +49,13 @@ data class TranscriptStatus(
 )
 
 /**
- * 质检结果
- */
-data class InspectionResult(
-    val overallConclusion: String = "",
-    val overallScore: Int = 0,
-    val summary: String = "",
-    val items: List<InspectionItemResult> = emptyList()
-)
-
-data class InspectionItemResult(
-    val itemName: String = "",
-    val verdict: String = "",
-    val evidence: String = "",
-    val confidence: Double = 0.0,
-    val aiReasoning: String = ""
-)
-
-/**
- * 服务器客户端 — 上传录音、查询转写状态、查询质检结果
+ * 服务器客户端 — 用户名密码登录，自动换取并续期 JWT token。
+ * token 由服务端滑动续期（每次请求返回新 token），只要持续使用就不过期。
  */
 class ServerClient(
     private val baseUrl: String = "http://localhost:8080",
-    private val apiKey: String = ""
+    private val username: String = "admin",
+    private val password: String = ""
 ) {
     private val gson = Gson()
     private val client = OkHttpClient.Builder()
@@ -80,9 +64,67 @@ class ServerClient(
         .writeTimeout(120, TimeUnit.SECONDS)
         .build()
 
+    // 内存中的 token 缓存
+    @Volatile private var cachedToken: String? = null
+
     companion object {
         private const val TAG = "ServerClient"
     }
+
+    /**
+     * 登录，获取 JWT token
+     */
+    private suspend fun login(): String = withContext(Dispatchers.IO) {
+        val requestBody = gson.toJson(mapOf(
+            "username" to username,
+            "password" to password
+        )).toRequestBody("application/json; charset=utf-8".toMediaType())
+
+        val request = Request.Builder()
+            .url("$baseUrl/api/auth/login")
+            .post(requestBody)
+            .build()
+
+        val response = client.newCall(request).execute()
+        val body = response.body?.string() ?: ""
+
+        if (response.isSuccessful) {
+            val token = JsonParser.parseString(body).asJsonObject.get("token")?.asString
+                ?: throw Exception("登录响应缺少 token")
+            token
+        } else {
+            val error = try {
+                JsonParser.parseString(body).asJsonObject.get("error")?.asString
+            } catch (_: Exception) { "HTTP ${response.code}" }
+            throw Exception(error ?: "登录失败")
+        }
+    }
+
+    /**
+     * 执行带认证的请求。自动处理 token 获取、续期、过期重登。
+     */
+    private suspend fun authedRequest(build: (token: String) -> Request): okhttp3.Response =
+        withContext(Dispatchers.IO) {
+            // 确保有 token
+            var token = cachedToken ?: login().also { cachedToken = it }
+
+            var response = client.newCall(build(token)).execute()
+
+            // token 过期（401），重新登录后重试一次
+            if (response.code == 401) {
+                response.close()
+                token = login().also { cachedToken = it }
+                response = client.newCall(build(token)).execute()
+            }
+
+            // 服务端返回新 token（滑动续期），更新缓存
+            val newToken = response.header("X-New-Token")
+            if (!newToken.isNullOrBlank()) {
+                cachedToken = newToken
+            }
+
+            response
+        }
 
     /**
      * 上传录音文件 + 元数据
@@ -92,22 +134,22 @@ class ServerClient(
             try {
                 val metadataJson = gson.toJson(metadata)
 
-                val requestBody = MultipartBody.Builder()
-                    .setType(MultipartBody.FORM)
-                    .addFormDataPart("metadata", metadataJson)
-                    .addFormDataPart("audio", audioFile.name,
-                        audioFile.asRequestBody("audio/wav".toMediaType()))
-                    .build()
+                val response = authedRequest { token ->
+                    val requestBody = MultipartBody.Builder()
+                        .setType(MultipartBody.FORM)
+                        .addFormDataPart("metadata", metadataJson)
+                        .addFormDataPart("audio", audioFile.name,
+                            audioFile.asRequestBody("audio/wav".toMediaType()))
+                        .build()
 
-                val request = Request.Builder()
-                    .url("$baseUrl/api/records")
-                    .addHeader("Authorization", "Bearer $apiKey")
-                    .post(requestBody)
-                    .build()
+                    Request.Builder()
+                        .url("$baseUrl/api/records")
+                        .addHeader("Authorization", "Bearer $token")
+                        .post(requestBody)
+                        .build()
+                }
 
-                val response = client.newCall(request).execute()
                 val body = response.body?.string() ?: ""
-
                 if (response.isSuccessful) {
                     val json = JsonParser.parseString(body).asJsonObject
                     val record = json.getAsJsonObject("record")
@@ -135,18 +177,17 @@ class ServerClient(
     suspend fun getTranscriptStatus(recordId: String): Result<TranscriptStatus> =
         withContext(Dispatchers.IO) {
             try {
-                val request = Request.Builder()
-                    .url("$baseUrl/api/records/$recordId/transcript-status")
-                    .addHeader("Authorization", "Bearer $apiKey")
-                    .get()
-                    .build()
+                val response = authedRequest { token ->
+                    Request.Builder()
+                        .url("$baseUrl/api/records/$recordId/transcript-status")
+                        .addHeader("Authorization", "Bearer $token")
+                        .get()
+                        .build()
+                }
 
-                val response = client.newCall(request).execute()
                 val body = response.body?.string() ?: ""
-
                 if (response.isSuccessful) {
-                    val status = gson.fromJson(body, TranscriptStatus::class.java)
-                    Result.success(status)
+                    Result.success(gson.fromJson(body, TranscriptStatus::class.java))
                 } else {
                     Result.failure(Exception("查询失败"))
                 }
@@ -156,42 +197,21 @@ class ServerClient(
         }
 
     /**
-     * 获取记录详情（含转写文本和质检结果）
-     */
-    suspend fun getRecordDetail(recordId: String): Result<String> =
-        withContext(Dispatchers.IO) {
-            try {
-                val request = Request.Builder()
-                    .url("$baseUrl/api/records/$recordId")
-                    .addHeader("Authorization", "Bearer $apiKey")
-                    .get()
-                    .build()
-
-                val response = client.newCall(request).execute()
-                val body = response.body?.string() ?: ""
-                if (response.isSuccessful) Result.success(body)
-                else Result.failure(Exception("查询失败"))
-            } catch (e: Exception) {
-                Result.failure(e)
-            }
-        }
-
-    /**
-     * 测试服务器连接
+     * 测试服务器连接（登录 + 拉取一条记录）
      */
     suspend fun testConnection(): Result<String> = withContext(Dispatchers.IO) {
         try {
-            val request = Request.Builder()
-                .url("$baseUrl/api/records?page=1&page_size=1")
-                .addHeader("Authorization", "Bearer $apiKey")
-                .get()
-                .build()
-
-            val response = client.newCall(request).execute()
+            val response = authedRequest { token ->
+                Request.Builder()
+                    .url("$baseUrl/api/records?page=1&page_size=1")
+                    .addHeader("Authorization", "Bearer $token")
+                    .get()
+                    .build()
+            }
             if (response.isSuccessful) {
                 Result.success("连接成功")
             } else {
-                Result.failure(Exception("认证失败，请检查 API Key"))
+                Result.failure(Exception("认证失败，请检查用户名密码"))
             }
         } catch (e: Exception) {
             Result.failure(Exception("连接失败: ${e.message}"))

@@ -2,7 +2,6 @@ package com.voicenote.app.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.voicenote.app.core.di.AppSettings
 import com.voicenote.app.core.di.SettingsDataStore
 import com.voicenote.app.core.network.ServerClient
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,7 +20,8 @@ data class TestResult(
 data class SettingsUiState(
     val isLoading: Boolean = true,
     val serverUrl: String = "http://192.168.1.1:8080",
-    val serverApiKey: String = "",
+    val username: String = "admin",
+    val password: String = "",
     val isTesting: Boolean = false,
     val testResults: List<TestResult> = emptyList(),
     val showResults: Boolean = false,
@@ -42,7 +42,8 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     serverUrl = settings.serverUrl,
-                    serverApiKey = settings.serverApiKey
+                    username = settings.username,
+                    password = settings.password
                 )
             }
         }
@@ -52,15 +53,20 @@ class SettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(serverUrl = url)
     }
 
-    fun updateServerApiKey(apiKey: String) {
-        _uiState.value = _uiState.value.copy(serverApiKey = apiKey)
+    fun updateUsername(username: String) {
+        _uiState.value = _uiState.value.copy(username = username)
+    }
+
+    fun updatePassword(password: String) {
+        _uiState.value = _uiState.value.copy(password = password)
     }
 
     fun save() {
         viewModelScope.launch {
             settingsDataStore.updateServerConfig(
                 url = _uiState.value.serverUrl,
-                apiKey = _uiState.value.serverApiKey
+                username = _uiState.value.username,
+                password = _uiState.value.password
             )
             _uiState.value = _uiState.value.copy(saveCount = _uiState.value.saveCount + 1)
         }
@@ -77,7 +83,7 @@ class SettingsViewModel @Inject constructor(
 
         viewModelScope.launch {
             val results = mutableListOf<TestResult>()
-            val client = ServerClient(state.serverUrl, state.serverApiKey)
+            val client = ServerClient(state.serverUrl, state.username, state.password)
 
             val result = client.testConnection()
             result.onSuccess { msg ->

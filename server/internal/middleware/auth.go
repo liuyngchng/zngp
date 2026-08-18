@@ -48,6 +48,8 @@ func ParseToken(tokenString string) (*Claims, error) {
 	return nil, ErrTokenInvalid
 }
 
+// AuthRequired extracts the JWT token, and on success,
+// issues a refreshed token (sliding expiration) in the X-New-Token response header.
 func AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
@@ -70,6 +72,13 @@ func AuthRequired() gin.HandlerFunc {
 
 		c.Set("user_id", claims.UserID)
 		c.Set("username", claims.Username)
+
+		// 滑动续期：每次请求都签发新 token，有效期重置为 72 小时
+		newToken, err := GenerateToken(claims.UserID, claims.Username)
+		if err == nil {
+			c.Header("X-New-Token", newToken)
+		}
+
 		c.Next()
 	}
 }
@@ -77,7 +86,6 @@ func AuthRequired() gin.HandlerFunc {
 // AuthWebRequired is a web-page version: redirects to /login if not authenticated
 func AuthWebRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Check Authorization header first (for pages that fetch with JS)
 		header := c.GetHeader("Authorization")
 		if header != "" {
 			parts := strings.SplitN(header, " ", 2)
@@ -86,13 +94,16 @@ func AuthWebRequired() gin.HandlerFunc {
 				if err == nil {
 					c.Set("user_id", claims.UserID)
 					c.Set("username", claims.Username)
+
+					// 滑动续期
+					newToken, _ := GenerateToken(claims.UserID, claims.Username)
+					c.Header("X-New-Token", newToken)
+
 					c.Next()
 					return
 				}
 			}
 		}
-		// For web pages, allow through — the client-side JS in layout.html handles redirect
-		// API calls are protected by AuthRequired() on the /api routes
 		c.Next()
 	}
 }

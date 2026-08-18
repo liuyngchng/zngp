@@ -17,7 +17,8 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 data class AppSettings(
     // 服务器配置
     val serverUrl: String = "http://192.168.1.1:8080",
-    val serverApiKey: String = ""
+    val username: String = "admin",
+    val password: String = ""
 )
 
 @Singleton
@@ -26,20 +27,23 @@ class SettingsDataStore @Inject constructor(
 ) {
     private object Keys {
         val SERVER_URL = stringPreferencesKey("server_url")
-        val SERVER_API_KEY = stringPreferencesKey("server_api_key")
+        val USERNAME = stringPreferencesKey("username")
+        val PASSWORD = stringPreferencesKey("password")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { prefs ->
         AppSettings(
             serverUrl = prefs[Keys.SERVER_URL] ?: "http://192.168.1.1:8080",
-            serverApiKey = prefs[Keys.SERVER_API_KEY] ?: ""
+            username = prefs[Keys.USERNAME] ?: "admin",
+            password = prefs[Keys.PASSWORD] ?: ""
         )
     }
 
-    suspend fun updateServerConfig(url: String, apiKey: String) {
+    suspend fun updateServerConfig(url: String, username: String, password: String) {
         context.dataStore.edit {
             it[Keys.SERVER_URL] = url
-            it[Keys.SERVER_API_KEY] = apiKey
+            it[Keys.USERNAME] = username
+            it[Keys.PASSWORD] = password
         }
     }
 }
