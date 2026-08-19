@@ -1,13 +1,10 @@
 {{define "content_records"}}
 <div class="page-header">
     <h1><i class="fas fa-list-alt"></i> 记录列表</h1>
-    <div style="display:flex;gap:12px;align-items:center;">
-        <form method="GET" action="/records" class="search-form">
-            <input type="text" name="keyword" value="{{.keyword}}" placeholder="搜索客户、安检员、标题..." class="search-input">
-            <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> 搜索</button>
-        </form>
-        <a href="/upload" class="btn btn-primary"><i class="fas fa-cloud-upload-alt"></i> 上传</a>
-    </div>
+    <form method="GET" action="/records" class="search-form">
+        <input type="text" name="keyword" value="{{.keyword}}" placeholder="搜索客户、安检员、标题..." class="search-input">
+        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> 搜索</button>
+    </form>
 </div>
 
 <div class="section">

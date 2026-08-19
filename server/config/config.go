@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	Server   ServerConfig   `yaml:"server"`
+	System   SystemConfig   `yaml:"system"`
 	Database DatabaseConfig `yaml:"database"`
 	Auth     AuthConfig     `yaml:"auth"`
 	ASR      ASRConfig      `yaml:"asr"`
@@ -18,6 +19,10 @@ type Config struct {
 type ServerConfig struct {
 	Port string `yaml:"port"`
 	Host string `yaml:"host"`
+}
+
+type SystemConfig struct {
+	Name string `yaml:"name"`
 }
 
 type DatabaseConfig struct {
@@ -43,7 +48,6 @@ type LLMConfig struct {
 	Endpoint string `yaml:"endpoint"`
 	APIKey   string `yaml:"api_key"`
 	Model    string `yaml:"model"`
-	Proxy    string `yaml:"proxy"`
 }
 
 type UploadConfig struct {
@@ -70,6 +74,9 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Server.Host == "" {
 		cfg.Server.Host = "0.0.0.0"
+	}
+	if cfg.System.Name == "" {
+		cfg.System.Name = "ZNGP 服务质量平台"
 	}
 	if cfg.Database.Path == "" {
 		cfg.Database.Path = "./data/voice_note.db"

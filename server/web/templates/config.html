@@ -31,10 +31,6 @@
         <label><i class="fas fa-microchip"></i> 模型名称</label>
         <input type="text" id="llmModel" class="form-input" placeholder="deepseek-v4-flash">
     </div>
-    <div class="form-group">
-        <label><i class="fas fa-network-wired"></i> 代理地址</label>
-        <input type="text" id="llmProxy" class="form-input" placeholder="http://proxy3.bj.petrochina:8080">
-    </div>
 
     <button class="btn btn-primary" onclick="saveConfig()"><i class="fas fa-check"></i> 保存配置</button>
     <div id="configMsg" style="margin-top:12px"></div>
@@ -50,7 +46,6 @@
                 document.getElementById('asrModel').value = cfg.asr_model || '';
                 document.getElementById('llmEndpoint').value = cfg.llm_endpoint || '';
                 document.getElementById('llmModel').value = cfg.llm_model || '';
-                document.getElementById('llmProxy').value = cfg.llm_proxy || '';
             }
         } catch (err) {}
     });
@@ -63,7 +58,6 @@
             llm_endpoint: document.getElementById('llmEndpoint').value,
             llm_api_key: document.getElementById('llmApiKey').value,
             llm_model: document.getElementById('llmModel').value,
-            llm_proxy: document.getElementById('llmProxy').value,
         };
         const msg = document.getElementById('configMsg');
         try {

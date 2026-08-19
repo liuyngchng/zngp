@@ -1,6 +1,6 @@
 /* ============================================================
    ZNGP 服务质量平台 — 全局样式
-   设计参考 kb-chat-flow 项目
+   侧边栏布局
    ============================================================ */
 
 :root {
@@ -9,7 +9,11 @@
     --primary-deep: #2c487e;
     --grad: linear-gradient(135deg, #4b6cb7, #3a5a9e);
     --grad-header: linear-gradient(to right, #4b6cb7, #182848);
-    --bg: #e4edf5;
+    --sidebar-bg: #182848;
+    --sidebar-hover: #1e3a6e;
+    --sidebar-active: #4b6cb7;
+    --sidebar-text: #bcc9e0;
+    --bg: #f0f2f5;
     --surface: #ffffff;
     --text: #2c3e50;
     --text-muted: #64748b;
@@ -30,103 +34,124 @@
 }
 
 body {
-    background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+    background: var(--bg);
     min-height: 100vh;
-    padding: 20px;
     color: var(--text);
     line-height: 1.6;
 }
 
 /* ============================================================
-   主容器
+   整体布局：侧边栏 + 主内容区
    ============================================================ */
-.container {
-    width: 100%;
-    max-width: 1280px;
-    margin: 0 auto;
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
+.app-layout {
     display: flex;
-    flex-direction: column;
-    min-height: calc(100vh - 40px);
+    min-height: 100vh;
 }
 
 /* ============================================================
-   Header
+   侧边栏
    ============================================================ */
-header.navbar {
-    background: var(--grad-header);
-    color: white;
-    padding: 0 30px;
-    height: 72px;
+.sidebar {
+    width: 220px;
+    background: var(--sidebar-bg);
     display: flex;
-    align-items: center;
-    position: relative;
+    flex-direction: column;
+    flex-shrink: 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    overflow-y: auto;
+    z-index: 50;
 }
 
-.nav-brand {
-    font-size: 1.3rem;
-    font-weight: 700;
-    color: white;
-    text-decoration: none;
+.sidebar-brand {
     display: flex;
     align-items: center;
     gap: 10px;
-}
-
-.nav-brand i {
-    font-size: 1.4rem;
-    opacity: 0.9;
-}
-
-.nav-links {
-    display: flex;
-    gap: 8px;
-    margin-left: auto;
-}
-
-.nav-link {
-    padding: 8px 16px;
-    background: rgba(255, 255, 255, 0.15);
-    color: white;
-    border-radius: 5px;
+    padding: 20px 20px 16px;
+    color: #fff;
     text-decoration: none;
-    font-size: 0.9rem;
+    font-size: 1rem;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.sidebar-brand i {
+    font-size: 1.3rem;
+    color: #6b9be0;
+}
+
+.sidebar-nav {
+    flex: 1;
+    padding: 8px 0;
+}
+
+.nav-group-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #6b8ab8;
+    padding: 14px 20px 6px;
+    font-weight: 600;
+}
+
+.side-link {
     display: flex;
     align-items: center;
-    gap: 8px;
-    transition: all 0.3s;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    gap: 10px;
+    padding: 12px 20px;
+    color: var(--sidebar-text);
+    text-decoration: none;
+    font-size: 0.9rem;
+    border-left: 3px solid transparent;
+    transition: all 0.2s;
+}
+
+.side-link:hover {
+    background: var(--sidebar-hover);
+    color: #e8edf5;
+}
+
+.side-link.active {
+    background: var(--sidebar-active);
+    color: #fff;
+    border-left-color: #8ab4f8;
     font-weight: 600;
-    white-space: nowrap;
 }
 
-.nav-link:hover {
-    background: rgba(255, 255, 255, 0.25);
-    transform: translateY(-2px);
+.side-link i {
+    width: 18px;
+    text-align: center;
+    font-size: 0.9rem;
 }
 
-.nav-link.active {
-    background: rgba(255, 255, 255, 0.3);
+.sidebar-footer {
+    padding: 12px 0;
+    border-top: 1px solid rgba(255,255,255,0.08);
 }
 
-.nav-link-danger {
-    background: rgba(255, 80, 80, 0.25);
-    border-color: rgba(255, 100, 100, 0.5);
+.side-link-danger {
+    color: #ff7875;
 }
 
-.nav-link-danger:hover {
-    background: rgba(255, 80, 80, 0.45);
+.side-link-danger:hover {
+    background: rgba(255, 77, 79, 0.15);
+    color: #ff4d4f;
 }
 
 /* ============================================================
    主内容区
    ============================================================ */
+.main-area {
+    flex: 1;
+    margin-left: 220px;
+    min-width: 0;
+}
+
 .main-content {
     padding: 24px 32px 32px;
-    flex: 1;
+    max-width: 1280px;
 }
 
 .page-header {
@@ -167,7 +192,7 @@ header.navbar {
     padding: 24px;
     text-align: center;
     transition: all 0.2s;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 .stat-card:hover {
@@ -204,7 +229,7 @@ header.navbar {
     border-radius: 12px;
     padding: 24px;
     margin-bottom: 24px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 .section h2 {
@@ -415,16 +440,12 @@ header.navbar {
     align-items: start;
 }
 
-@media (max-width: 900px) {
-    .detail-grid { grid-template-columns: 1fr; }
-}
-
 .detail-section {
     background: white;
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 24px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 .detail-list dt {
@@ -547,6 +568,53 @@ header.navbar {
 }
 
 .template-items { margin-bottom: 16px; }
+
+/* ============================================================
+   Tab 切换
+   ============================================================ */
+.tabs {
+    display: flex;
+    gap: 4px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+}
+
+.tab-btn {
+    padding: 8px 20px;
+    border: none;
+    background: transparent;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.tab-btn:hover {
+    color: var(--primary);
+    background: rgba(75, 108, 183, 0.06);
+}
+
+.tab-btn.active {
+    background: var(--primary);
+    color: #fff;
+}
+
+.tab-panel {
+    display: none;
+}
+
+.tab-panel.active {
+    display: block;
+}
 
 /* ============================================================
    分页
@@ -730,10 +798,36 @@ header.navbar {
    响应式
    ============================================================ */
 @media (max-width: 768px) {
-    body { padding: 10px; }
-    .container { border-radius: 12px; min-height: calc(100vh - 20px); }
-    header.navbar { padding: 0 15px; height: auto; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 14px; padding-bottom: 14px; }
-    .nav-links { margin-left: 0; flex-wrap: wrap; }
-    .main-content { padding: 16px; }
-    .detail-grid { grid-template-columns: 1fr; }
+    .sidebar {
+        width: 60px;
+    }
+    .sidebar-brand span,
+    .side-link,
+    .nav-group-title {
+        display: none;
+    }
+    .sidebar-brand {
+        justify-content: center;
+        padding: 16px 8px;
+    }
+    .sidebar-brand i {
+        font-size: 1.3rem;
+    }
+    .side-link {
+        justify-content: center;
+        padding: 12px 8px;
+        border-left: none;
+    }
+    .side-link i {
+        font-size: 1.1rem;
+    }
+    .main-area {
+        margin-left: 60px;
+    }
+    .main-content {
+        padding: 16px;
+    }
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
 }

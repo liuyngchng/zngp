@@ -2,6 +2,9 @@ server:
   port: "8080"
   host: "0.0.0.0"
 
+system:
+  name: "客户服务质量平台"
+
 database:
   path: "./data/voice_note.db"
 
@@ -22,7 +25,6 @@ llm:
   endpoint: "https://api.deepseek.com"
   api_key: ""
   model: "deepseek-v4-flash"
-  proxy: "http://proxy3.bj.petrochina:8080"
 
 upload:
   max_file_size_mb: 100

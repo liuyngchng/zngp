@@ -4,34 +4,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.title}} - ZNGP 服务质量平台</title>
+    <title>{{.title}} - {{sysName}}</title>
     <link rel="stylesheet" href="/static/lib/font-awesome.all.min.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=2">
+    <link rel="stylesheet" href="/static/css/style.css?v=3">
 </head>
 <body>
-    <div class="container">
-        <header class="navbar">
-            <a href="/" class="nav-brand"><i class="fas fa-microphone-alt"></i> ZNGP 服务质量平台</a>
-            <div class="nav-links">
-                <a href="/" class="nav-link"><i class="fas fa-tachometer-alt"></i> 仪表盘</a>
-                <a href="/upload" class="nav-link"><i class="fas fa-cloud-upload-alt"></i> 上传</a>
-                <a href="/records" class="nav-link"><i class="fas fa-list-alt"></i> 记录</a>
-                <a href="/templates" class="nav-link"><i class="fas fa-clipboard-check"></i> 模板</a>
-                <a href="/config" class="nav-link"><i class="fas fa-cog"></i> 配置</a>
-                <a href="/logout" class="nav-link nav-link-danger"><i class="fas fa-sign-out-alt"></i> 退出</a>
+    <div class="app-layout">
+        <aside class="sidebar">
+            <a href="/" class="sidebar-brand">
+                <i class="fas fa-microphone-alt"></i>
+                <span>{{sysName}}</span>
+            </a>
+
+            <nav class="sidebar-nav">
+                <div class="nav-group-title">业务管理</div>
+                <a href="/" class="side-link {{if eq .content_block "content_dashboard"}}active{{end}}">
+                    <i class="fas fa-tachometer-alt"></i> 仪表盘
+                </a>
+                <a href="/upload" class="side-link {{if eq .content_block "content_upload"}}active{{end}}">
+                    <i class="fas fa-cloud-upload-alt"></i> 资料上传
+                </a>
+                <a href="/records" class="side-link {{if eq .content_block "content_records"}}active{{end}} {{if eq .content_block "content_record_detail"}}active{{end}}">
+                    <i class="fas fa-list-alt"></i> 记录列表
+                </a>
+                <a href="/templates" class="side-link {{if eq .content_block "content_templates"}}active{{end}} {{if eq .content_block "content_template_edit"}}active{{end}}">
+                    <i class="fas fa-clipboard-check"></i> 检查项模板
+                </a>
+
+                <div class="nav-group-title">系统</div>
+                <a href="/config" class="side-link {{if eq .content_block "content_config"}}active{{end}}">
+                    <i class="fas fa-cog"></i> 系统配置
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <a href="/logout" class="side-link side-link-danger">
+                    <i class="fas fa-sign-out-alt"></i> 退出登录
+                </a>
             </div>
-        </header>
-        <main class="main-content">
-            {{if eq .content_block "content_dashboard"}}{{template "content_dashboard" .}}
-            {{else if eq .content_block "content_records"}}{{template "content_records" .}}
-            {{else if eq .content_block "content_record_detail"}}{{template "content_record_detail" .}}
-            {{else if eq .content_block "content_upload"}}{{template "content_upload" .}}
-            {{else if eq .content_block "content_templates"}}{{template "content_templates" .}}
-            {{else if eq .content_block "content_template_edit"}}{{template "content_template_edit" .}}
-            {{else if eq .content_block "content_config"}}{{template "content_config" .}}
-            {{else}}{{template "content_error" .}}
-            {{end}}
-        </main>
+        </aside>
+
+        <div class="main-area">
+            <main class="main-content">
+                {{if eq .content_block "content_dashboard"}}{{template "content_dashboard" .}}
+                {{else if eq .content_block "content_records"}}{{template "content_records" .}}
+                {{else if eq .content_block "content_record_detail"}}{{template "content_record_detail" .}}
+                {{else if eq .content_block "content_upload"}}{{template "content_upload" .}}
+                {{else if eq .content_block "content_templates"}}{{template "content_templates" .}}
+                {{else if eq .content_block "content_template_edit"}}{{template "content_template_edit" .}}
+                {{else if eq .content_block "content_config"}}{{template "content_config" .}}
+                {{else}}{{template "content_error" .}}
+                {{end}}
+            </main>
+        </div>
     </div>
     <script>
         // 认证已由 Cookie 处理，API 请求自动携带 Cookie

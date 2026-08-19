@@ -20,17 +20,15 @@ type SafeConfig struct {
 	ASRModel       string `json:"asr_model"`
 	LLMEndpoint    string `json:"llm_endpoint"`
 	LLMModel       string `json:"llm_model"`
-	LLMProxy       string `json:"llm_proxy"`
 }
 
 type UpdateConfigRequest struct {
-	ASRAPIKey       string `json:"asr_api_key"`
-	ASRWorkspaceID  string `json:"asr_workspace_id"`
-	ASRModel        string `json:"asr_model"`
-	LLMAPIKey       string `json:"llm_api_key"`
-	LLMEndpoint     string `json:"llm_endpoint"`
-	LLMModel        string `json:"llm_model"`
-	LLMProxy        string `json:"llm_proxy"`
+	ASRAPIKey      string `json:"asr_api_key"`
+	ASRWorkspaceID string `json:"asr_workspace_id"`
+	ASRModel       string `json:"asr_model"`
+	LLMAPIKey      string `json:"llm_api_key"`
+	LLMEndpoint    string `json:"llm_endpoint"`
+	LLMModel       string `json:"llm_model"`
 }
 
 func (h *ConfigHandler) GetConfig(c *gin.Context) {
@@ -40,7 +38,6 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 		ASRModel:       cfg.ASR.Model,
 		LLMEndpoint:    cfg.LLM.Endpoint,
 		LLMModel:       cfg.LLM.Model,
-		LLMProxy:       cfg.LLM.Proxy,
 	})
 }
 
@@ -70,17 +67,14 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 	if req.LLMModel != "" {
 		cfg.LLM.Model = req.LLMModel
 	}
-	if req.LLMProxy != "" {
-		cfg.LLM.Proxy = req.LLMProxy
-	}
 
-	// Save back to config.yaml
+	// Save back to cfg.yml
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "序列化配置失败"})
 		return
 	}
-	if err := writeConfigFile("config.yaml", data); err != nil {
+	if err := writeConfigFile("cfg.yml", data); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存配置失败"})
 		return
 	}

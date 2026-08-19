@@ -103,7 +103,7 @@ func (h *WebHandler) RecordDetail(c *gin.Context) {
 func (h *WebHandler) UploadPage(c *gin.Context) {
 	c.HTML(http.StatusOK, "upload.html", gin.H{
 		"content_block": "content_upload",
-		"title":         "上传音频",
+		"title":         "资料上传",
 		"max_size_mb":   config.AppConfig.Upload.MaxFileSizeMB,
 	})
 }

@@ -19,7 +19,7 @@ ENV LANG=C.UTF-8 \
 WORKDIR /opt/zngp
 
 COPY server .
-COPY config.yaml ./config.yaml
+COPY cfg.yml ./cfg.yml
 COPY web ./web
 COPY seed ./seed
 

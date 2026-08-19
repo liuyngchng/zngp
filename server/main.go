@@ -17,7 +17,7 @@ import (
 
 func main() {
 	// Load config
-	cfgPath := "config.yaml"
+	cfgPath := "cfg.yml"
 	if len(os.Args) > 1 {
 		cfgPath = os.Args[1]
 	}
@@ -91,6 +91,7 @@ func main() {
 			default: return "需复核"
 			}
 		},
+		"sysName": func() string { return config.AppConfig.System.Name },
 	})
 
 	// Load templates

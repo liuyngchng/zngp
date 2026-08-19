@@ -92,7 +92,7 @@ info "准备构建上下文: $BUILD_DIR"
 
 cp "$SCRIPT_DIR/$BINARY" "$BUILD_DIR/"
 cp "$SCRIPT_DIR/Dockerfile" "$BUILD_DIR/"
-cp "$SCRIPT_DIR/config.yaml" "$BUILD_DIR/"
+cp "$SCRIPT_DIR/cfg.yml" "$BUILD_DIR/"
 cp -r "$SCRIPT_DIR/web" "$BUILD_DIR/web"
 cp -r "$SCRIPT_DIR/seed" "$BUILD_DIR/seed"
 
@@ -124,7 +124,7 @@ info "打包 release..."
 docker save -o "$RELEASE_DIR/${IMAGE_NAME}.tar" "$FULL_IMAGE"
 
 # 配置文件
-cp "$SCRIPT_DIR/config.yaml" "$RELEASE_DIR/config.yaml"
+cp "$SCRIPT_DIR/cfg.yml" "$RELEASE_DIR/cfg.yml"
 
 # 启动脚本
 cat > "$RELEASE_DIR/start.sh" << 'STARTSCRIPT'
@@ -152,7 +152,7 @@ docker run -d \
     --name zngp-server \
     --restart always \
     -p 8080:8080 \
-    -v "$SCRIPT_DIR/config.yaml:/opt/zngp/config.yaml:ro" \
+    -v "$SCRIPT_DIR/cfg.yml:/opt/zngp/cfg.yml:ro" \
     -v "$SCRIPT_DIR/data:/opt/zngp/data" \
     zngp-server:latest
 
@@ -178,7 +178,7 @@ echo ""
 info "交付步骤:"
 echo "  1. 将 $(basename "$RELEASE_TAR") 拷贝到目标机器"
 echo "  2. 解压: tar xzf $(basename "$RELEASE_TAR")"
-echo "  3. 编辑 config.yaml 填写 ASR/LLM 的 API Key"
+echo "  3. 编辑 cfg.yml 填写 ASR/LLM 的 API Key"
 echo "  4. 启动: cd zngp-server && ./start.sh"
 echo "  5. 打开浏览器 http://<服务器IP>:8080"
 echo "  6. 查看日志: docker logs -f zngp-server"

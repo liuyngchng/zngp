@@ -2,12 +2,12 @@ package service
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -88,7 +88,7 @@ func TranscribeAudio(audioPath string) (string, error) {
 	httpReq.Header.Set("Authorization", "Bearer "+cfg.ASR.APIKey)
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	client := createHTTPClient(cfg.LLM.Proxy)
+	client := createDirectClient()
 
 	resp, err := client.Do(httpReq)
 	if err != nil {
@@ -121,22 +121,15 @@ func TranscribeAudio(audioPath string) (string, error) {
 	return asrResp.Choices[0].Message.Content, nil
 }
 
-// createHTTPClient creates an HTTP client with optional proxy support
-func createHTTPClient(proxyURL string) *http.Client {
-	transport := &http.Transport{
-		MaxIdleConns:    10,
-		IdleConnTimeout: 30 * time.Second,
-	}
-
-	if proxyURL != "" {
-		proxy, err := url.Parse(proxyURL)
-		if err == nil {
-			transport.Proxy = http.ProxyURL(proxy)
-		}
-	}
-
+// createDirectClient creates an HTTP client with no proxy and TLS verification disabled
+func createDirectClient() *http.Client {
 	return &http.Client{
-		Timeout:   120 * time.Second,
-		Transport: transport,
+		Timeout: 120 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:    10,
+			IdleConnTimeout: 30 * time.Second,
+			Proxy:           nil,
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
 	}
 }

@@ -2,11 +2,11 @@ package service
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -73,7 +73,7 @@ func ChatCompletion(systemPrompt, userPrompt string) (string, int, error) {
 
 	client := &http.Client{
 		Timeout:   180 * time.Second,
-		Transport: createTransportWithProxy(cfg.LLM.Proxy),
+		Transport: createDirectTransport(),
 	}
 
 	resp, err := client.Do(httpReq)
@@ -120,25 +120,11 @@ func buildOpenAIURL(endpoint string) string {
 	return trimmed + "/v1/chat/completions"
 }
 
-func createTransportWithProxy(proxyURL string) *http.Transport {
-	transport := &http.Transport{
+func createDirectTransport() *http.Transport {
+	return &http.Transport{
 		MaxIdleConns:    10,
 		IdleConnTimeout: 30 * time.Second,
+		Proxy:           nil,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	if proxyURL != "" {
-		if u, err := parseProxyURL(proxyURL); err == nil {
-			transport.Proxy = func(req *http.Request) (*url.URL, error) {
-				return u, nil
-			}
-		}
-	}
-	return transport
-}
-
-func parseProxyURL(s string) (*url.URL, error) {
-	// Go's net/url needs a scheme
-	if !strings.Contains(s, "://") {
-		s = "http://" + s
-	}
-	return url.Parse(s)
 }
