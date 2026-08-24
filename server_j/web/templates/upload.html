@@ -1,0 +1,139 @@
+{{define "content_upload"}}
+<div class="page-header">
+    <h1><i class="fas fa-cloud-upload-alt"></i> 资料上传</h1>
+</div>
+
+<div class="section" style="max-width:640px">
+    <p class="text-muted" style="margin-bottom:20px">
+        <i class="fas fa-info-circle"></i> 手动上传录音文件进行转写和质检，与 App 端上传字段对齐。
+    </p>
+
+    <form id="uploadForm" onsubmit="handleUpload(event)">
+        <div class="form-group">
+            <label><i class="fas fa-tag"></i> 标题</label>
+            <input type="text" id="title" class="form-input" placeholder="可选，自动用文件名填充">
+        </div>
+
+        <div class="form-row">
+            <div class="form-group flex-1">
+                <label><i class="fas fa-user"></i> 客户姓名 *</label>
+                <input type="text" id="customerName" class="form-input" required placeholder="必填">
+            </div>
+            <div class="form-group flex-1">
+                <label><i class="fas fa-user-tie"></i> 安检员/拜访人 *</label>
+                <input type="text" id="inspectorName" class="form-input" required placeholder="必填">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label><i class="fas fa-map-marker-alt"></i> 客户地址</label>
+            <input type="text" id="customerAddress" class="form-input" placeholder="如：北京市朝阳区XX路XX号">
+        </div>
+
+        <div class="form-row">
+            <div class="form-group flex-1">
+                <label><i class="fas fa-calendar-alt"></i> 安检/拜访日期</label>
+                <input type="date" id="inspectionDate" class="form-input">
+            </div>
+            <div class="form-group flex-1">
+                <label><i class="fas fa-tag"></i> 来源类型</label>
+                <select id="sourceType" class="form-select">
+                    <option value="IMPORT">手动导入 (IMPORT)</option>
+                    <option value="RECORDING">录音 (RECORDING)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label><i class="fas fa-pencil-alt"></i> 备注</label>
+            <textarea id="description" class="form-input" rows="3" placeholder="可选，补充说明"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label><i class="fas fa-file-audio"></i> 音频文件 *</label>
+            <input type="file" id="audioFile" class="form-input" accept="audio/*,.wav,.mp3,.m4a,.aac,.ogg" required>
+            <div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px">
+                <i class="fas fa-file"></i> 支持 WAV、MP3、M4A 等格式，最大 {{printf "%d" .max_size_mb}}MB
+            </div>
+        </div>
+
+        <div id="uploadMsg" style="margin:12px 0"></div>
+
+        <button type="submit" class="btn btn-primary btn-full" id="submitBtn">
+            <i class="fas fa-cloud-upload-alt"></i> 开始上传
+        </button>
+    </form>
+
+    <div id="uploadResult" style="display:none; margin-top:20px; padding:16px; border-radius:8px;"></div>
+</div>
+
+<script>
+async function handleUpload(e) {
+    e.preventDefault();
+
+    const submitBtn = document.getElementById('submitBtn');
+    const msgDiv = document.getElementById('uploadMsg');
+    const resultDiv = document.getElementById('uploadResult');
+
+    const audioFile = document.getElementById('audioFile').files[0];
+    if (!audioFile) {
+        msgDiv.innerHTML = '<span style="color:var(--red)"><i class="fas fa-exclamation-circle"></i> 请选择音频文件</span>';
+        return;
+    }
+
+    const maxSizeMB = {{.max_size_mb}};
+    if (audioFile.size > maxSizeMB * 1024 * 1024) {
+        msgDiv.innerHTML = '<span style="color:var(--red)"><i class="fas fa-exclamation-circle"></i> 文件超过大小限制 (' + maxSizeMB + 'MB)</span>';
+        return;
+    }
+
+    const metadata = {
+        title: document.getElementById('title').value || audioFile.name.replace(/\.[^.]+$/, ''),
+        description: document.getElementById('description').value,
+        inspector_name: document.getElementById('inspectorName').value,
+        customer_name: document.getElementById('customerName').value,
+        customer_address: document.getElementById('customerAddress').value,
+        inspection_date: document.getElementById('inspectionDate').value + 'T00:00:00Z',
+        source_type: document.getElementById('sourceType').value,
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> 上传中...';
+    msgDiv.innerHTML = '';
+
+    try {
+        const formData = new FormData();
+        formData.append('metadata', JSON.stringify(metadata));
+        formData.append('audio', audioFile);
+
+        const resp = await fetch('/api/records', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: formData,
+        });
+
+        const data = await resp.json();
+
+        if (resp.ok) {
+            resultDiv.style.display = 'block';
+            resultDiv.style.background = '#dcfce7';
+            resultDiv.style.border = '1px solid var(--green)';
+            resultDiv.innerHTML = `
+                <strong style="color:var(--green)"><i class="fas fa-check-circle"></i> 上传成功！</strong>
+                <p style="margin-top:8px">${data.message || ''}</p>
+                <p style="margin-top:4px">转写状态：<span class="badge badge-${data.transcript_status || 'PENDING'}">${data.transcript_status || 'PENDING'}</span></p>
+                <a href="/records/${data.record?.id || ''}" class="btn btn-primary" style="margin-top:12px"><i class="fas fa-arrow-right"></i> 查看详情</a>
+            `;
+            document.getElementById('uploadForm').reset();
+        } else {
+            msgDiv.innerHTML = '<span style="color:var(--red)"><i class="fas fa-exclamation-circle"></i> 上传失败: ' + (data.error || '未知错误') + '</span>';
+        }
+    } catch (err) {
+        msgDiv.innerHTML = '<span style="color:var(--red)"><i class="fas fa-exclamation-circle"></i> 上传失败: ' + err.message + '</span>';
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> 开始上传';
+    }
+}
+</script>
+{{end}}{{template "layout" .}}

@@ -1,0 +1,8 @@
+{{define "content_error"}}
+<div class="error-page">
+    <h1><i class="fas fa-exclamation-triangle"></i> 出错了</h1>
+    <p class="error-message" style="color:var(--text-muted);margin-bottom:16px;">{{.error}}</p>
+    <a href="/" class="btn btn-primary"><i class="fas fa-home"></i> 返回首页</a>
+</div>
+{{end}}
+{{template "layout" .}}

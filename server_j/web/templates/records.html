@@ -1,0 +1,59 @@
+{{define "content_records"}}
+<div class="page-header">
+    <h1><i class="fas fa-list-alt"></i> 记录列表</h1>
+    <form method="GET" action="/records" class="search-form">
+        <input type="text" name="keyword" value="{{.keyword}}" placeholder="搜索客户、安检员、标题..." class="search-input">
+        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> 搜索</button>
+    </form>
+</div>
+
+<div class="section">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>客户</th>
+                <th>安检员</th>
+                <th>地址</th>
+                <th>日期</th>
+                <th>时长</th>
+                <th>转写</th>
+                <th>质检</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .records}}
+            <tr>
+                <td>{{.CustomerName}}</td>
+                <td>{{.InspectorName}}</td>
+                <td>{{.CustomerAddress}}</td>
+                <td>{{.InspectionDate.Format "2006-01-02"}}</td>
+                <td>{{printf "%.0f" .AudioDuration}}s</td>
+                <td><span class="badge badge-{{transcriptStatusClass .TranscriptStatus}}">{{.TranscriptStatus}}</span></td>
+                <td><span class="badge badge-{{inspectionStatusClass .InspectionStatus}}">{{.InspectionStatus}}</span></td>
+                <td>
+                    <a href="/records/{{.ID}}" class="btn btn-sm btn-outline"><i class="fas fa-arrow-right"></i> 详情</a>
+                </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="8" class="text-center" style="padding:32px;">
+                <i class="fas fa-inbox" style="font-size:2rem;color:#d0d5dd;display:block;margin-bottom:8px;"></i>
+                暂无记录
+            </td></tr>
+            {{end}}
+        </tbody>
+    </table>
+
+    {{if gt .total_pages 1}}
+    <div class="pagination">
+        {{if gt .page 1}}
+        <a href="/records?page={{sub .page 1}}&keyword={{.keyword}}" class="btn btn-outline"><i class="fas fa-chevron-left"></i> 上一页</a>
+        {{end}}
+        <span>第 {{.page}} / {{.total_pages}} 页（共 {{.total}} 条）</span>
+        {{if lt .page .total_pages}}
+        <a href="/records?page={{add .page 1}}&keyword={{.keyword}}" class="btn btn-outline">下一页 <i class="fas fa-chevron-right"></i></a>
+        {{end}}
+    </div>
+    {{end}}
+</div>
+{{end}}{{template "layout" .}}

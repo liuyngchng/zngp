@@ -1,0 +1,31 @@
+server:
+  port: "8080"
+  host: "0.0.0.0"
+
+system:
+  name: "客户服务质量平台"
+
+database:
+  path: "./data/voice_note.db"
+
+auth:
+  username: "admin"
+  password: "admin123"
+  jwt_secret: "change-me-to-a-random-string"
+
+asr:
+  provider: "aliyun_bailian"
+  workspace_id: ""
+  api_key: ""
+  model: "qwen3-asr-flash"
+  base_url: "https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+
+llm:
+  provider: "openai_compatible"
+  endpoint: "https://api.deepseek.com"
+  api_key: ""
+  model: "deepseek-v4-flash"
+
+upload:
+  max_file_size_mb: 100
+  storage_dir: "./data/uploads"

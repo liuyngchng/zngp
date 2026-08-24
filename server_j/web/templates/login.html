@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/lib/font-awesome.all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=2">
+    <title>登录 - {{sysName}}</title>
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="login-card">
+            <div class="login-header">
+                <i class="fas fa-microphone-alt"></i>
+                <h1>{{sysName}}</h1>
+                <p>燃气入户安检 · 客户拜访合规质检</p>
+            </div>
+
+            <div class="login-error" id="loginError" style="display:none;">
+                <i class="fas fa-exclamation-circle"></i> <span id="loginErrorMsg"></span>
+            </div>
+
+            <form id="loginForm" class="login-form">
+                <div class="login-field">
+                    <label><i class="fas fa-user"></i> 用户名</label>
+                    <input type="text" id="username" name="username" required placeholder="请输入用户名" autocomplete="username">
+                </div>
+                <div class="login-field">
+                    <label><i class="fas fa-lock"></i> 密码</label>
+                    <input type="password" id="password" name="password" required placeholder="请输入密码" autocomplete="current-password">
+                </div>
+                <button type="submit" class="login-btn">
+                    <i class="fas fa-sign-in-alt"></i> 登 录
+                </button>
+            </form>
+
+            <div class="login-footer">
+                <p>{{sysName}} · 语音质检管理系统</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function doLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errEl = document.getElementById('loginError');
+            const errMsg = document.getElementById('loginErrorMsg');
+            try {
+                const resp = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username, password})
+                });
+                if (resp.ok) {
+                    // 服务端已通过 Set-Cookie 写入 token，直接跳转
+                    window.location.href = '/';
+                } else {
+                    const data = await resp.json();
+                    errMsg.textContent = data.error || '登录失败';
+                    errEl.style.display = 'flex';
+                }
+            } catch (err) {
+                errMsg.textContent = '网络错误，请检查服务器连接';
+                errEl.style.display = 'flex';
+            }
+        }
+        document.getElementById('loginForm').addEventListener('submit', doLogin);
+    </script>
+</body>
+</html>

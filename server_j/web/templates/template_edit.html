@@ -1,0 +1,134 @@
+{{define "content_template_edit"}}
+<div class="page-header">
+    <h1><i class="fas fa-edit"></i> 编辑模板：{{.template.Name}}</h1>
+    <a href="/templates" class="btn btn-outline"><i class="fas fa-arrow-left"></i> 返回</a>
+</div>
+
+<div class="section">
+    <h2><i class="fas fa-info-circle"></i> 模板信息</h2>
+    <div class="form-group">
+        <label><i class="fas fa-tag"></i> 模板名称</label>
+        <input type="text" id="templateName" value="{{.template.Name}}" class="form-input">
+    </div>
+    <div class="form-group">
+        <label><i class="fas fa-pencil-alt"></i> 描述</label>
+        <input type="text" id="templateDesc" value="{{.template.Description}}" class="form-input">
+    </div>
+    <button class="btn btn-primary" onclick="saveTemplate({{.template.ID}})"><i class="fas fa-check"></i> 保存模板信息</button>
+</div>
+
+<div class="section">
+    <h2><i class="fas fa-list-ul"></i> 检查项列表</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th style="width:50px">序号</th>
+                <th>名称</th>
+                <th>描述</th>
+                <th>分类</th>
+                <th>必检</th>
+                <th>权重</th>
+                <th style="width:80px">操作</th>
+            </tr>
+        </thead>
+        <tbody id="itemsBody">
+            {{range .template.Items}}
+            <tr id="item-row-{{.ID}}">
+                <td>{{.ItemNumber}}</td>
+                <td>{{.Name}}</td>
+                <td>{{.Description}}</td>
+                <td>{{.Category}}</td>
+                <td>{{if .IsRequired}}<i class="fas fa-check" style="color:var(--green)"></i>{{end}}</td>
+                <td>{{.Weight}}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="deleteItem({{.ID}})"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+
+    <h3><i class="fas fa-plus-circle"></i> 添加检查项</h3>
+    <form class="add-item-form" onsubmit="addItem(event, {{.template.ID}})">
+        <div class="form-row">
+            <div class="form-group">
+                <label>序号</label>
+                <input type="number" id="itemNumber" value="1" min="1" class="form-input" style="width:80px">
+            </div>
+            <div class="form-group flex-1">
+                <label>名称</label>
+                <input type="text" id="itemName" required class="form-input">
+            </div>
+            <div class="form-group flex-1">
+                <label>描述</label>
+                <input type="text" id="itemDesc" class="form-input">
+            </div>
+            <div class="form-group">
+                <label>分类</label>
+                <input type="text" id="itemCategory" class="form-input" style="width:120px">
+            </div>
+            <div class="form-group">
+                <label>必检</label>
+                <input type="checkbox" id="itemRequired" checked style="width:20px;height:20px;">
+            </div>
+            <div class="form-group">
+                <label>权重</label>
+                <input type="number" id="itemWeight" value="1" min="1" max="5" class="form-input" style="width:70px">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> 添加</button>
+    </form>
+</div>
+
+<script>
+    async function saveTemplate(id) {
+        const name = document.getElementById('templateName').value;
+        const desc = document.getElementById('templateDesc').value;
+        try {
+            const resp = await apiFetch('/api/templates/' + id, {
+                method: 'PUT',
+                body: JSON.stringify({name: name, description: desc})
+            });
+            if (resp.ok) alert('保存成功');
+            else alert('保存失败');
+        } catch (err) { alert('保存失败: ' + err.message); }
+    }
+
+    async function addItem(e, templateId) {
+        e.preventDefault();
+        const item = {
+            item_number: parseInt(document.getElementById('itemNumber').value),
+            name: document.getElementById('itemName').value,
+            description: document.getElementById('itemDesc').value,
+            category: document.getElementById('itemCategory').value,
+            is_required: document.getElementById('itemRequired').checked,
+            weight: parseInt(document.getElementById('itemWeight').value)
+        };
+        try {
+            const resp = await apiFetch('/api/templates/' + templateId + '/items', {
+                method: 'POST',
+                body: JSON.stringify(item)
+            });
+            if (resp.ok) {
+                alert('添加成功');
+                window.location.reload();
+            } else {
+                const data = await resp.json();
+                alert('添加失败: ' + (data.error || ''));
+            }
+        } catch (err) { alert('添加失败: ' + err.message); }
+    }
+
+    async function deleteItem(itemId) {
+        if (!confirm('确认删除此检查项？')) return;
+        const templateId = {{.template.ID}};
+        try {
+            const resp = await apiFetch('/api/templates/' + templateId + '/items/' + itemId, {method: 'DELETE'});
+            if (resp.ok) {
+                document.getElementById('item-row-' + itemId).remove();
+                alert('已删除');
+            } else alert('删除失败');
+        } catch (err) { alert('删除失败: ' + err.message); }
+    }
+</script>
+{{end}}{{template "layout" .}}
