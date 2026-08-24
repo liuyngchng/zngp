@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rd.zngp.config.Config;
 import com.rd.zngp.model.*;
+import com.rd.zngp.model.Record;
 import com.rd.zngp.store.Store;
 
 import java.sql.SQLException;

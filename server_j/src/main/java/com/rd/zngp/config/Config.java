@@ -51,7 +51,7 @@ public class Config {
 
     public static class DatabaseConfig {
         @JsonProperty("path")
-        public String path = "./data/voice_note.db";
+        public String path = "./data/zngp.db";
     }
 
     public static class AuthConfig {
@@ -121,7 +121,7 @@ public class Config {
         if (cfg.server.port == null || cfg.server.port.isEmpty()) cfg.server.port = "8080";
         if (cfg.server.host == null || cfg.server.host.isEmpty()) cfg.server.host = "0.0.0.0";
         if (cfg.system.name == null || cfg.system.name.isEmpty()) cfg.system.name = "ZNGP 服务质量平台";
-        if (cfg.database.path == null || cfg.database.path.isEmpty()) cfg.database.path = "./data/voice_note.db";
+        if (cfg.database.path == null || cfg.database.path.isEmpty()) cfg.database.path = "./data/zngp.db";
         if (cfg.upload.maxFileSizeMB == 0) cfg.upload.maxFileSizeMB = 100;
         if (cfg.upload.storageDir == null || cfg.upload.storageDir.isEmpty()) cfg.upload.storageDir = "./data/uploads";
         if (cfg.asr.model == null || cfg.asr.model.isEmpty()) cfg.asr.model = "qwen3-asr-flash";

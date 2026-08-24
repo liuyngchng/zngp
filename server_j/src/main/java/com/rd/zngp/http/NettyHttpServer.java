@@ -17,6 +17,7 @@ import io.netty.util.CharsetUtil;
 import com.rd.zngp.config.Config;
 import com.rd.zngp.middleware.JwtUtil;
 import com.rd.zngp.model.*;
+import com.rd.zngp.model.Record;
 import com.rd.zngp.service.ASRService;
 import com.rd.zngp.service.InspectionService;
 import com.rd.zngp.store.Store;
@@ -65,9 +66,13 @@ public class NettyHttpServer {
             "template_edit", "config", "upload", "error", "login"};
         for (String name : names) {
             try {
-                String path = "web/templates/" + name + ".html";
-                String content = new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8);
-                templateCache.put(name, content);
+                String path = "/web/templates/" + name + ".html";
+                byte[] bytes = readClasspathResource(path);
+                if (bytes != null) {
+                    templateCache.put(name, new String(bytes, StandardCharsets.UTF_8));
+                } else {
+                    log.warn("无法加载模板: {}", name);
+                }
             } catch (Exception e) {
                 log.warn("无法加载模板: {}", name);
             }
@@ -245,9 +250,8 @@ public class NettyHttpServer {
         }
 
         try {
-            String filePath = path.substring(1); // Remove leading /
-            java.io.File file = new java.io.File(filePath);
-            if (!file.exists() || !file.isFile()) {
+            byte[] data = readClasspathResource("/web" + path);
+            if (data == null) {
                 FullHttpResponse resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
                 ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);
                 return;
@@ -264,7 +268,6 @@ public class NettyHttpServer {
             else if (path.endsWith(".png")) contentType = "image/png";
             else if (path.endsWith(".jpg") || path.endsWith(".jpeg")) contentType = "image/jpeg";
 
-            byte[] data = Files.readAllBytes(file.toPath());
             FullHttpResponse resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK,
                 io.netty.buffer.Unpooled.wrappedBuffer(data));
             resp.headers().set(HttpHeaderNames.CONTENT_TYPE, contentType);
@@ -286,11 +289,12 @@ public class NettyHttpServer {
                            HttpMethod method, AuthInfo auth, Map<String, String> queryParams) {
 
         // Extract route params from path (e.g., /api/records/:id/transcribe)
-        String apiPath = path.substring(5); // Remove "/api/"
+        String apiPath = path.substring(4); // Remove "/api", keep leading "/"
 
         // Public API: login
         if (apiPath.equals("/auth/login") && method == HttpMethod.POST) {
-            handleLogin(ctx, req);
+            FullHttpResponse resp = handleLogin(req);
+            sendAndClose(ctx, req, resp);
             return;
         }
 
@@ -409,7 +413,8 @@ public class NettyHttpServer {
         } else {
             // Add sliding expiration
             if (auth.token != null) {
-                setTokenCookie(resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+                resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+                setTokenCookie(resp, auth.token);
             }
 
             try {
@@ -1661,6 +1666,27 @@ public class NettyHttpServer {
             s = s.substring(0, s.length() - suffix.length());
         }
         return s;
+    }
+
+    /**
+     * Read a resource from classpath (works inside JAR and on filesystem).
+     * Returns null if the resource is not found.
+     */
+    private byte[] readClasspathResource(String resourcePath) {
+        try (java.io.InputStream in = getClass().getResourceAsStream(resourcePath)) {
+            if (in == null) {
+                return null;
+            }
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private String[] extractTwoParams(String path, String prefix, String middle) {

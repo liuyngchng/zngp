@@ -6,7 +6,7 @@ system:
   name: "客户服务质量平台"
 
 database:
-  path: "./data/voice_note.db"
+  path: "./data/zngp.db"
 
 auth:
   username: "admin"

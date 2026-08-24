@@ -4,6 +4,7 @@ import com.rd.zngp.config.Config;
 import com.rd.zngp.http.NettyHttpServer;
 import com.rd.zngp.model.InspectionItem;
 import com.rd.zngp.model.InspectionTemplate;
+import com.rd.zngp.model.User;
 import com.rd.zngp.store.Store;
 import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;

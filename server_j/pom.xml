@@ -10,7 +10,7 @@
     <packaging>jar</packaging>
 
     <name>zngp-server</name>
-    <description>ZNGP 语音质检服务端 (Netty)</description>
+    <description>客户服务质量平台</description>
 
     <properties>
         <!-- 编译目标固定为 Java 8，保证产物兼容 JDK 1.8 -->
@@ -81,16 +81,27 @@
             <version>0.4</version>
         </dependency>
 
-        <!-- SLF4J logging -->
+        <!-- SLF4J + Log4j2 logging -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>1.7.36</version>
         </dependency>
+        <!-- Log4j2 binding for SLF4J (replaces slf4j-simple) -->
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>1.7.36</version>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j-impl</artifactId>
+            <version>2.24.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>2.24.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>2.24.1</version>
         </dependency>
     </dependencies>
 

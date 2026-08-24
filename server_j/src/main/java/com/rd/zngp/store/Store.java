@@ -1,6 +1,7 @@
 package com.rd.zngp.store;
 
 import com.rd.zngp.model.*;
+import com.rd.zngp.model.Record;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
