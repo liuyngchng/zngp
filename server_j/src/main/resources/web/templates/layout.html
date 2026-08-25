@@ -46,15 +46,7 @@
 
         <div class="main-area">
             <main class="main-content">
-                {{if eq .content_block "content_dashboard"}}{{template "content_dashboard" .}}
-                {{else if eq .content_block "content_records"}}{{template "content_records" .}}
-                {{else if eq .content_block "content_record_detail"}}{{template "content_record_detail" .}}
-                {{else if eq .content_block "content_upload"}}{{template "content_upload" .}}
-                {{else if eq .content_block "content_templates"}}{{template "content_templates" .}}
-                {{else if eq .content_block "content_template_edit"}}{{template "content_template_edit" .}}
-                {{else if eq .content_block "content_config"}}{{template "content_config" .}}
-                {{else}}{{template "content_error" .}}
-                {{end}}
+                {{template "content" .}}
             </main>
         </div>
     </div>

@@ -997,7 +997,6 @@ public class NettyHttpServer {
             Store.OverviewResult overview = store.getOverview();
             Store.ListResult<Record> records = store.listRecords(1, 10, "");
 
-            String layout = templateCache.get("layout");
             String dashboard = templateCache.get("dashboard");
 
             Map<String, Object> data = new LinkedHashMap<>();
@@ -1011,11 +1010,7 @@ public class NettyHttpServer {
             data.put("none", null);
 
             String content = renderTemplate(dashboard, data);
-            data.put("__content__", content);
-
-            // Wrap in layout
-            String layoutWithPlaceholder = layout.replace("{{template \"content_dashboard\" .}}", "{{__content__}}");
-            String html = renderTemplate(layoutWithPlaceholder, data);
+            String html = wrapLayout(content, data);
             return htmlResp(200, html);
         } catch (Exception e) {
             log.error("仪表盘渲染失败", e);
@@ -1025,7 +1020,6 @@ public class NettyHttpServer {
 
     private FullHttpResponse renderUpload() {
         try {
-            String layout = templateCache.get("layout");
             String upload = templateCache.get("upload");
 
             Map<String, Object> data = new LinkedHashMap<>();
@@ -1034,10 +1028,7 @@ public class NettyHttpServer {
             data.put("max_size_mb", Config.appConfig.upload.maxFileSizeMB);
 
             String content = renderTemplate(upload, data);
-            data.put("__content__", content);
-
-            String layoutWithPlaceholder = layout.replace("{{template \"content_upload\" .}}", "{{__content__}}");
-            String html = renderTemplate(layoutWithPlaceholder, data);
+            String html = wrapLayout(content, data);
             return htmlResp(200, html);
         } catch (Exception e) {
             return renderError("渲染失败");
@@ -1053,7 +1044,6 @@ public class NettyHttpServer {
             Store.ListResult<Record> result = store.listRecords(page, pageSize, keyword);
             int totalPages = (int) ((result.total + pageSize - 1) / pageSize);
 
-            String layout = templateCache.get("layout");
             String recordsTmpl = templateCache.get("records");
 
             Map<String, Object> data = new LinkedHashMap<>();
@@ -1066,10 +1056,7 @@ public class NettyHttpServer {
             data.put("keyword", keyword);
 
             String content = renderTemplate(recordsTmpl, data);
-            data.put("__content__", content);
-
-            String layoutWithPlaceholder = layout.replace("{{template \"content_records\" .}}", "{{__content__}}");
-            String html = renderTemplate(layoutWithPlaceholder, data);
+            String html = wrapLayout(content, data);
             return htmlResp(200, html);
         } catch (Exception e) {
             return renderError("查询失败: " + e.getMessage());
@@ -1088,7 +1075,6 @@ public class NettyHttpServer {
 
             List<InspectionTemplate> templates = store.listTemplates();
 
-            String layout = templateCache.get("layout");
             String detailTmpl = templateCache.get("record_detail");
 
             Map<String, Object> data = new LinkedHashMap<>();
@@ -1099,10 +1085,7 @@ public class NettyHttpServer {
             data.put("templates", templates);
 
             String content = renderTemplate(detailTmpl, data);
-            data.put("__content__", content);
-
-            String layoutWithPlaceholder = layout.replace("{{template \"content_record_detail\" .}}", "{{__content__}}");
-            String html = renderTemplate(layoutWithPlaceholder, data);
+            String html = wrapLayout(content, data);
             return htmlResp(200, html);
         } catch (Exception e) {
             return renderError("查询失败: " + e.getMessage());
@@ -1113,7 +1096,6 @@ public class NettyHttpServer {
         try {
             List<InspectionTemplate> templates = store.listTemplates();
 
-            String layout = templateCache.get("layout");
             String templatesTmpl = templateCache.get("templates");
 
             Map<String, Object> data = new LinkedHashMap<>();
@@ -1122,10 +1104,7 @@ public class NettyHttpServer {
             data.put("templates", templates);
 
             String content = renderTemplate(templatesTmpl, data);
-            data.put("__content__", content);
-
-            String layoutWithPlaceholder = layout.replace("{{template \"content_templates\" .}}", "{{__content__}}");
-            String html = renderTemplate(layoutWithPlaceholder, data);
+            String html = wrapLayout(content, data);
             return htmlResp(200, html);
         } catch (Exception e) {
             return renderError("查询失败: " + e.getMessage());
@@ -1140,7 +1119,6 @@ public class NettyHttpServer {
                 return renderError("模板不存在");
             }
 
-            String layout = templateCache.get("layout");
             String editTmpl = templateCache.get("template_edit");
 
             Map<String, Object> data = new LinkedHashMap<>();
@@ -1149,10 +1127,7 @@ public class NettyHttpServer {
             data.put("template", template);
 
             String content = renderTemplate(editTmpl, data);
-            data.put("__content__", content);
-
-            String layoutWithPlaceholder = layout.replace("{{template \"content_template_edit\" .}}", "{{__content__}}");
-            String html = renderTemplate(layoutWithPlaceholder, data);
+            String html = wrapLayout(content, data);
             return htmlResp(200, html);
         } catch (NumberFormatException e) {
             return renderError("无效的模板ID");
@@ -1163,7 +1138,6 @@ public class NettyHttpServer {
 
     private FullHttpResponse renderConfig() {
         try {
-            String layout = templateCache.get("layout");
             String configTmpl = templateCache.get("config");
 
             Map<String, Object> data = new LinkedHashMap<>();
@@ -1171,10 +1145,7 @@ public class NettyHttpServer {
             data.put("title", "系统配置");
 
             String content = renderTemplate(configTmpl, data);
-            data.put("__content__", content);
-
-            String layoutWithPlaceholder = layout.replace("{{template \"content_config\" .}}", "{{__content__}}");
-            String html = renderTemplate(layoutWithPlaceholder, data);
+            String html = wrapLayout(content, data);
             return htmlResp(200, html);
         } catch (Exception e) {
             return renderError("渲染失败");
@@ -1183,7 +1154,6 @@ public class NettyHttpServer {
 
     private FullHttpResponse renderError(String msg) {
         try {
-            String layout = templateCache.get("layout");
             String errorTmpl = templateCache.get("error");
 
             Map<String, Object> data = new LinkedHashMap<>();
@@ -1192,10 +1162,7 @@ public class NettyHttpServer {
             data.put("error", msg);
 
             String content = renderTemplate(errorTmpl, data);
-            data.put("__content__", content);
-
-            String layoutWithPlaceholder = layout.replace("{{template \"content_error\" .}}", "{{__content__}}");
-            String html = renderTemplate(layoutWithPlaceholder, data);
+            String html = wrapLayout(content, data);
             return htmlResp(500, html);
         } catch (Exception e) {
             return htmlResp(500, "<html><body><h1>错误</h1><p>" + msg + "</p></body></html>");
@@ -1205,6 +1172,25 @@ public class NettyHttpServer {
     // ============================================================
     // Template Engine (simple Go-style template rendering)
     // ============================================================
+
+    /**
+     * Wrap rendered content into the shared layout. The content is inserted
+     * as raw HTML (no escaping), so use a unique placeholder that the
+     * template engine's escaping won't touch.
+     */
+    private String wrapLayout(String content, Map<String, Object> data) throws Exception {
+        String layout = templateCache.get("layout");
+        if (layout == null) {
+            return content;
+        }
+        // Use a sentinel that does not match the {{...}} pattern, so
+        // replaceDots/escaping leaves it intact.
+        final String SENTINEL = " CONTENT ";
+        String withPlaceholder = layout.replaceAll(
+            "\\{\\{template\\s+\"[^\"]+\"\\s+\\.\\}\\}", SENTINEL);
+        String html = renderTemplate(withPlaceholder, data);
+        return html.replace(SENTINEL, content);
+    }
 
     private String renderTemplate(String tmpl, Map<String, Object> data) throws Exception {
         if (data == null) {
