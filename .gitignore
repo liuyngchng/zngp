@@ -67,7 +67,7 @@ ios/VoiceNote/Libraries/
 # 离线 ASR 模型文件（体积大，不提交 git）
 models/
 
-# ===== Java / Maven (server_j) =====
+# ===== Java / Maven (srv_j) =====
 target/
 *.class
 *.jar
@@ -75,8 +75,8 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 
 # Maven 本地构建产物
-server_j/data/
-server_j/*.db
+srv_j/data/
+srv_j/*.db
 
 # ===== Claude Code =====
 .claude/settings.local.json

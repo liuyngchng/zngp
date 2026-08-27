@@ -101,6 +101,7 @@ public class NettyHttpServer {
                 .childOption(ChannelOption.SO_KEEPALIVE, true);
 
             log.info("服务启动: http://{}:{}", host, port);
+            log.info("本地访问: http://127.0.0.1:{}", port);
             ChannelFuture f = b.bind(host, port).sync();
             f.channel().closeFuture().sync();
         } finally {

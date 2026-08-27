@@ -181,6 +181,7 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
 	log.Printf("服务启动: http://%s", addr)
+	log.Printf("本地访问: http://127.0.0.1:%s", cfg.Server.Port)
 	if err := r.Run(addr); err != nil {
 		log.Fatalf("服务启动失败: %v", err)
 	}
