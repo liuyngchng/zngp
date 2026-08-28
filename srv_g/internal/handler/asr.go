@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -38,8 +39,10 @@ func (h *ASRHandler) Transcribe(c *gin.Context) {
 	}
 
 	// Run ASR
+	log.Printf("[ASR] 手动转写开始: record=%s, audio=%s", recordID, record.AudioFilePath)
 	text, err := service.TranscribeAudio(record.AudioFilePath)
 	if err != nil {
+		log.Printf("[ASR] 手动转写失败: record=%s, err=%v", recordID, err)
 		h.store.UpdateRecordTranscript(recordID, "", "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "转写失败: " + err.Error()})
 		return
@@ -47,10 +50,12 @@ func (h *ASRHandler) Transcribe(c *gin.Context) {
 
 	// Save transcript
 	if err := h.store.UpdateRecordTranscript(recordID, text, "COMPLETED"); err != nil {
+		log.Printf("[ASR] 手动转写保存失败: record=%s, err=%v", recordID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存转写结果失败"})
 		return
 	}
 
+	log.Printf("[ASR] 手动转写完成: record=%s, text_len=%d", recordID, len(text))
 	c.JSON(http.StatusOK, gin.H{
 		"record_id":  recordID,
 		"transcript": text,

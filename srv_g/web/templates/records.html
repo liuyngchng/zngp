@@ -33,6 +33,12 @@
                 <td><span class="badge badge-{{inspectionStatusClass .InspectionStatus}}">{{.InspectionStatus}}</span></td>
                 <td>
                     <a href="/records/{{.ID}}" class="btn btn-sm btn-outline"><i class="fas fa-arrow-right"></i> 详情</a>
+                    {{if eq .TranscriptStatus "FAILED"}}
+                    <button class="btn btn-sm btn-warning" onclick="retryTranscribe('{{.ID}}')" title="重试转写"><i class="fas fa-redo"></i></button>
+                    {{end}}
+                    {{if eq .InspectionStatus "FAILED"}}
+                    <button class="btn btn-sm btn-warning" onclick="retryInspect('{{.ID}}')" title="重试质检"><i class="fas fa-redo"></i></button>
+                    {{end}}
                 </td>
             </tr>
             {{else}}
@@ -56,4 +62,27 @@
     </div>
     {{end}}
 </div>
+
+<script>
+    async function retryTranscribe(id) {
+        if (!confirm('确认重新转写该记录？')) return;
+        try {
+            const resp = await apiFetch('/api/records/' + id + '/transcribe', {method: 'POST'});
+            if (resp.ok) {
+                alert('转写完成，正在刷新...');
+                window.location.reload();
+            } else {
+                const data = await resp.json();
+                alert('转写失败: ' + (data.error || '未知错误'));
+            }
+        } catch (err) {
+            alert('转写失败: ' + err.message);
+        }
+    }
+
+    function retryInspect(id) {
+        // 质检需选择模板，跳转到详情页操作
+        window.location.href = '/records/' + id;
+    }
+</script>
 {{end}}{{template "layout" .}}

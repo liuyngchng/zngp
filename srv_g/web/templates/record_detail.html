@@ -22,6 +22,17 @@
         <h3><i class="fas fa-file-alt"></i> 转写文本</h3>
         {{if .record.TranscriptText}}
         <div class="transcript-text">{{.record.TranscriptText}}</div>
+        {{else if eq .record.TranscriptStatus "FAILED"}}
+        <div class="empty-state">
+            <i class="fas fa-exclamation-triangle" style="color:#f59e0b;"></i>
+            <p>转写失败</p>
+            <button class="btn btn-primary" onclick="transcribeRecord('{{.record.ID}}')"><i class="fas fa-redo"></i> 重试转写</button>
+        </div>
+        {{else if eq .record.TranscriptStatus "PROCESSING"}}
+        <div class="empty-state">
+            <i class="fas fa-spinner fa-pulse"></i>
+            <p>正在转写中...</p>
+        </div>
         {{else}}
         <div class="empty-state">
             <i class="fas fa-spinner fa-pulse"></i>
@@ -63,6 +74,31 @@
                 {{end}}
             </tbody>
         </table>
+        {{else if eq .record.InspectionStatus "FAILED"}}
+        <div class="empty-state">
+            <i class="fas fa-exclamation-triangle" style="color:#f59e0b;"></i>
+            <p>质检失败</p>
+            {{if .record.TranscriptText}}
+            <form onsubmit="inspectRecord(event, '{{.record.ID}}')">
+                <div class="form-group">
+                    <label for="templateSelect"><i class="fas fa-clipboard-check"></i> 选择检查项模板</label>
+                    <select id="templateSelect" class="form-select">
+                        {{range .templates}}
+                        <option value="{{.ID}}">{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-redo"></i> 重试质检</button>
+            </form>
+            {{else}}
+            <p class="text-muted"><i class="fas fa-info-circle"></i> 请先完成转写</p>
+            {{end}}
+        </div>
+        {{else if eq .record.InspectionStatus "PROCESSING"}}
+        <div class="empty-state">
+            <i class="fas fa-spinner fa-pulse"></i>
+            <p>正在质检中...</p>
+        </div>
         {{else}}
         <div class="empty-state">
             <i class="fas fa-robot"></i>

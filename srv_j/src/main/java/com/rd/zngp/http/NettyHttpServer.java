@@ -711,8 +711,10 @@ public class NettyHttpServer {
 
             store.updateRecordTranscript(id, "", "PROCESSING");
 
+            log.info("[ASR] 手动转写开始: record={}, audio={}", id, record.audioFilePath);
             String text = ASRService.transcribeAudio(record.audioFilePath);
             store.updateRecordTranscript(id, text, "COMPLETED");
+            log.info("[ASR] 手动转写完成: record={}, text_len={}", id, text != null ? text.length() : 0);
 
             Map<String, Object> resp = new LinkedHashMap<>();
             resp.put("record_id", id);
@@ -720,7 +722,7 @@ public class NettyHttpServer {
             resp.put("status", "COMPLETED");
             return jsonResp(200, resp);
         } catch (Exception e) {
-            log.error("转写失败", e);
+            log.error("[ASR] 手动转写失败: record={}, err={}", id, e.getMessage());
             try { store.updateRecordTranscript(id, "", "FAILED"); } catch (Exception ignored) {}
             return jsonResp(500, errorMap("转写失败: " + e.getMessage()));
         }
@@ -742,12 +744,14 @@ public class NettyHttpServer {
 
             store.updateRecordInspectionStatus(id, "PROCESSING");
 
+            log.info("[LLM] 质检开始: record={}, template_id={}", id, templateId);
             InspectionResult result = inspectionService.run(record, templateId);
             store.updateRecordInspectionStatus(id, "COMPLETED");
+            log.info("[LLM] 质检完成: record={}, conclusion={}, score={}, tokens={}", id, result.overallConclusion, result.overallScore, result.tokensUsed);
 
             return jsonResp(200, result);
         } catch (Exception e) {
-            log.error("质检失败", e);
+            log.error("[LLM] 质检失败: record={}, err={}", id, e.getMessage());
             try { store.updateRecordInspectionStatus(id, "FAILED"); } catch (Exception ignored) {}
             return jsonResp(500, errorMap("质检失败: " + e.getMessage()));
         }

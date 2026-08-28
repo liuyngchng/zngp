@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -71,36 +72,46 @@ func ChatCompletion(systemPrompt, userPrompt string) (string, int, error) {
 	httpReq.Header.Set("Authorization", "Bearer "+cfg.LLM.APIKey)
 	httpReq.Header.Set("Content-Type", "application/json")
 
+	log.Printf("[LLM] 请求开始: url=%s, model=%s, system_prompt_len=%d, user_prompt_len=%d", apiURL, cfg.LLM.Model, len(systemPrompt), len(userPrompt))
+	startTime := time.Now()
+
 	client := &http.Client{
 		Timeout:   180 * time.Second,
 		Transport: createDirectTransport(),
 	}
 
 	resp, err := client.Do(httpReq)
+	elapsed := time.Since(startTime)
 	if err != nil {
+		log.Printf("[LLM] 请求失败: url=%s, err=%v, elapsed=%v", apiURL, err, elapsed)
 		return "", 0, fmt.Errorf("LLM API 请求失败: %w", err)
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Printf("[LLM] 读取响应失败: err=%v, elapsed=%v", err, elapsed)
 		return "", 0, fmt.Errorf("读取响应失败: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("[LLM] 返回错误: url=%s, status=%d, body=%s, elapsed=%v", apiURL, resp.StatusCode, string(bodyBytes), elapsed)
 		return "", 0, fmt.Errorf("LLM API 返回错误 (%d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var llmResp LLMResponse
 	if err := json.Unmarshal(bodyBytes, &llmResp); err != nil {
+		log.Printf("[LLM] 解析响应失败: err=%v, body=%s, elapsed=%v", err, string(bodyBytes), elapsed)
 		return "", 0, fmt.Errorf("解析响应失败: %w", err)
 	}
 
 	if llmResp.Error != nil {
+		log.Printf("[LLM] API 业务错误: err=%s, elapsed=%v", llmResp.Error.Message, elapsed)
 		return "", 0, fmt.Errorf("LLM 错误: %s", llmResp.Error.Message)
 	}
 
 	if len(llmResp.Choices) == 0 {
+		log.Printf("[LLM] 返回空结果: elapsed=%v", elapsed)
 		return "", 0, fmt.Errorf("LLM 返回空结果")
 	}
 
@@ -109,6 +120,7 @@ func ChatCompletion(systemPrompt, userPrompt string) (string, int, error) {
 		tokens = llmResp.Usage.TotalTokens
 	}
 
+	log.Printf("[LLM] 请求成功: response_len=%d, tokens=%d, elapsed=%v", len(llmResp.Choices[0].Message.Content), tokens, elapsed)
 	return llmResp.Choices[0].Message.Content, tokens, nil
 }
 

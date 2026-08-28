@@ -12,12 +12,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * LLM service, mirroring server/internal/service/llm.go.
  */
 public class LLMService {
 
     private static final ObjectMapper mapper = new ObjectMapper();
+    private static final Logger log = LoggerFactory.getLogger(LLMService.class);
 
     public static class LLMResponse {
         @JsonProperty("choices")
@@ -94,24 +98,31 @@ public class LLMService {
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setDoOutput(true);
 
+        log.info("[LLM] 请求开始: url={}, model={}, system_prompt_len={}, user_prompt_len={}", apiURL, cfg.llm.model, systemPrompt.length(), userPrompt.length());
+        long startMs = System.currentTimeMillis();
+
         try (OutputStream os = conn.getOutputStream()) {
             os.write(jsonBody.getBytes(StandardCharsets.UTF_8));
         }
 
         int status = conn.getResponseCode();
+        long elapsedMs = System.currentTimeMillis() - startMs;
         byte[] bodyBytes = ASRService.readAll(conn, status);
 
         if (status != 200) {
+            log.error("[LLM] 返回错误: url={}, status={}, body={}, elapsed_ms={}", apiURL, status, new String(bodyBytes, StandardCharsets.UTF_8), elapsedMs);
             throw new Exception("LLM API 返回错误 (" + status + "): " + new String(bodyBytes, StandardCharsets.UTF_8));
         }
 
         LLMResponse llmResp = mapper.readValue(bodyBytes, LLMResponse.class);
 
         if (llmResp.error != null) {
+            log.error("[LLM] API 业务错误: err={}, elapsed_ms={}", llmResp.error.message, elapsedMs);
             throw new Exception("LLM 错误: " + llmResp.error.message);
         }
 
         if (llmResp.choices == null || llmResp.choices.isEmpty()) {
+            log.error("[LLM] 返回空结果: elapsed_ms={}", elapsedMs);
             throw new Exception("LLM 返回空结果");
         }
 
@@ -120,7 +131,9 @@ public class LLMService {
             tokens = llmResp.usage.totalTokens;
         }
 
-        return new ChatResult(llmResp.choices.get(0).message.content, tokens);
+        String content = llmResp.choices.get(0).message.content;
+        log.info("[LLM] 请求成功: response_len={}, tokens={}, elapsed_ms={}", content != null ? content.length() : 0, tokens, elapsedMs);
+        return new ChatResult(content, tokens);
     }
 
     private static String buildOpenAIURL(String endpoint) {

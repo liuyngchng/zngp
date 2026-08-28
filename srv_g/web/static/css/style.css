@@ -357,6 +357,15 @@ body {
     background: #ffcdd2;
 }
 
+.btn-warning {
+    background: #fef9c3;
+    color: #b45309;
+}
+
+.btn-warning:hover {
+    background: #fde68a;
+}
+
 .btn-sm {
     padding: 5px 12px;
     font-size: 0.8rem;

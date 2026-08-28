@@ -20,6 +20,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * ASR service, mirroring server/internal/service/asr.go.
  * Sends audio to Aliyun Bailian ASR (OpenAI-compatible) endpoint.
@@ -27,6 +30,7 @@ import java.util.Map;
 public class ASRService {
 
     private static final ObjectMapper mapper = new ObjectMapper();
+    private static final Logger log = LoggerFactory.getLogger(ASRService.class);
 
     public static class ASRResponse {
         @JsonProperty("id")
@@ -116,28 +120,37 @@ public class ASRService {
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setDoOutput(true);
 
+        log.info("[ASR] 请求开始: url={}, model={}, audio_size={}, audio_path={}", apiURL, cfg.asr.model, data.length, audioPath);
+        long startMs = System.currentTimeMillis();
+
         try (OutputStream os = conn.getOutputStream()) {
             os.write(jsonBody.getBytes(StandardCharsets.UTF_8));
         }
 
         int status = conn.getResponseCode();
+        long elapsedMs = System.currentTimeMillis() - startMs;
         byte[] bodyBytes = readAll(conn, status);
 
         if (status != 200) {
+            log.error("[ASR] 返回错误: url={}, status={}, body={}, elapsed_ms={}", apiURL, status, new String(bodyBytes, StandardCharsets.UTF_8), elapsedMs);
             throw new Exception("ASR API 返回错误 (" + status + "): " + new String(bodyBytes, StandardCharsets.UTF_8));
         }
 
         ASRResponse asrResp = mapper.readValue(bodyBytes, ASRResponse.class);
 
         if (asrResp.error != null) {
+            log.error("[ASR] API 业务错误: err={}, elapsed_ms={}", asrResp.error.message, elapsedMs);
             throw new Exception("ASR 错误: " + asrResp.error.message);
         }
 
         if (asrResp.choices == null || asrResp.choices.isEmpty()) {
+            log.error("[ASR] 返回空结果: elapsed_ms={}", elapsedMs);
             throw new Exception("ASR 返回空结果");
         }
 
-        return asrResp.choices.get(0).message.content;
+        String text = asrResp.choices.get(0).message.content;
+        log.info("[ASR] 请求成功: text_len={}, elapsed_ms={}", text != null ? text.length() : 0, elapsedMs);
+        return text;
     }
 
     static byte[] readAll(HttpURLConnection conn, int status) throws IOException {
