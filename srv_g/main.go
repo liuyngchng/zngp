@@ -24,24 +24,24 @@ func main() {
 
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		log.Fatalf("加载配置失败: %v", err)
+		log.Fatalf("config_load_failed %v", err)
 	}
 
 	// Initialize store
 	st, err := store.New(cfg.Database.Path)
 	if err != nil {
-		log.Fatalf("初始化数据库失败: %v", err)
+		log.Fatalf("store_init_failed %v", err)
 	}
 
 	// Ensure default admin user
 	if err := handler.EnsureDefaultAdmin(st); err != nil {
-		log.Fatalf("创建默认管理员失败: %v", err)
+		log.Fatalf("default_admin_create_failed %v", err)
 	}
-	log.Println("默认管理员已就绪")
+	log.Println("default_admin_ready")
 
 	// Seed templates (if not existed)
 	if err := SeedTemplates(st); err != nil {
-		log.Printf("种子模板插入失败: %v", err)
+		log.Printf("seed_template_insert_failed %v", err)
 	}
 
 	// Initialize handlers
@@ -175,15 +175,15 @@ func main() {
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		<-quit
-		log.Println("正在关闭服务...")
+		log.Println("server_shutting_down")
 		os.Exit(0)
 	}()
 
 	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
-	log.Printf("服务启动: http://%s", addr)
-	log.Printf("本地访问: http://127.0.0.1:%s", cfg.Server.Port)
+	log.Printf("server_starting_http %s", addr)
+	log.Printf("server_local_access_127_0_0_1 %s", cfg.Server.Port)
 	if err := r.Run(addr); err != nil {
-		log.Fatalf("服务启动失败: %v", err)
+		log.Fatalf("server_run_failed %v", err)
 	}
 }
 
@@ -203,6 +203,6 @@ func SeedTemplates(st *store.Store) error {
 			return err
 		}
 	}
-	log.Println("检查项模板已初始化")
+	log.Println("templates_seeded")
 	return nil
 }

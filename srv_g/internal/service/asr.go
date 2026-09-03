@@ -89,7 +89,7 @@ func TranscribeAudio(audioPath string) (string, error) {
 	httpReq.Header.Set("Authorization", "Bearer "+cfg.ASR.APIKey)
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	log.Printf("[ASR] 请求开始: url=%s, model=%s, audio_size=%d, audio_path=%s", apiURL, cfg.ASR.Model, len(data), audioPath)
+	log.Printf("asr_request_start url=%s model=%s audio_size=%d audio_path=%s", apiURL, cfg.ASR.Model, len(data), audioPath)
 	startTime := time.Now()
 
 	client := createDirectClient()
@@ -97,40 +97,40 @@ func TranscribeAudio(audioPath string) (string, error) {
 	resp, err := client.Do(httpReq)
 	elapsed := time.Since(startTime)
 	if err != nil {
-		log.Printf("[ASR] 请求失败: url=%s, err=%v, elapsed=%v", apiURL, err, elapsed)
+		log.Printf("asr_request_failed url=%s err=%v elapsed=%v", apiURL, err, elapsed)
 		return "", fmt.Errorf("ASR API 请求失败: %w", err)
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("[ASR] 读取响应失败: err=%v, elapsed=%v", err, elapsed)
+		log.Printf("asr_read_response_failed err=%v elapsed=%v", err, elapsed)
 		return "", fmt.Errorf("读取响应失败: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("[ASR] 返回错误: url=%s, status=%d, body=%s, elapsed=%v", apiURL, resp.StatusCode, string(bodyBytes), elapsed)
+		log.Printf("asr_api_http_error url=%s status=%d body=%s elapsed=%v", apiURL, resp.StatusCode, string(bodyBytes), elapsed)
 		return "", fmt.Errorf("ASR API 返回错误 (%d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var asrResp ASRResponse
 	if err := json.Unmarshal(bodyBytes, &asrResp); err != nil {
-		log.Printf("[ASR] 解析响应失败: err=%v, body=%s, elapsed=%v", err, string(bodyBytes), elapsed)
+		log.Printf("asr_json_parse_failed err=%v body=%s elapsed=%v", err, string(bodyBytes), elapsed)
 		return "", fmt.Errorf("解析响应失败: %w", err)
 	}
 
 	if asrResp.Error != nil {
-		log.Printf("[ASR] API 业务错误: err=%s, elapsed=%v", asrResp.Error.Message, elapsed)
+		log.Printf("asr_api_biz_error err=%s elapsed=%v", asrResp.Error.Message, elapsed)
 		return "", fmt.Errorf("ASR 错误: %s", asrResp.Error.Message)
 	}
 
 	if len(asrResp.Choices) == 0 {
-		log.Printf("[ASR] 返回空结果: elapsed=%v", elapsed)
+		log.Printf("asr_empty_result elapsed=%v", elapsed)
 		return "", fmt.Errorf("ASR 返回空结果")
 	}
 
 	text := asrResp.Choices[0].Message.Content
-	log.Printf("[ASR] 请求成功: text_len=%d, elapsed=%v", len(text), elapsed)
+	log.Printf("asr_request_success text_len=%d elapsed=%v", len(text), elapsed)
 	return text, nil
 }
 

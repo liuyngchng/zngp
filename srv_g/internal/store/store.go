@@ -52,6 +52,6 @@ func (s *Store) Migrate() error {
 	); err != nil {
 		return err
 	}
-	log.Println("数据库迁移完成")
+	log.Println("db_migration_done")
 	return nil
 }

@@ -64,6 +64,11 @@ if ! command -v go &>/dev/null; then
     exit 1
 fi
 
+if ! command -v garble &>/dev/null; then
+    err "garble 未安装，请执行: go install mvdan.cc/garble@v0.14.2"
+    exit 1
+fi
+
 if ! command -v docker &>/dev/null; then
     err "docker 未安装或不在 PATH 中"
     exit 1
@@ -75,8 +80,8 @@ cd "$SCRIPT_DIR"
 # 删除旧二进制
 rm -f "$BINARY"
 
-info "本地编译 Go 二进制 (CGO_ENABLED=0)..."
-CGO_ENABLED=0 go build -ldflags="-s -w" -o "$BINARY" .
+info "本地编译 Go 二进制 (CGO_ENABLED=0, garble 混淆)..."
+GOTOOLCHAIN=local CGO_ENABLED=0 garble -literals build -ldflags="-s -w" -o "$BINARY" .
 
 # 自检：确认产物是静态链接
 if ! file "$BINARY" | grep -q "statically linked"; then

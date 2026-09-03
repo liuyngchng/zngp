@@ -126,29 +126,29 @@ func (h *RecordHandler) Upload(c *gin.Context) {
 
 // autoTranscribe runs ASR in the background and updates the record
 func (h *RecordHandler) autoTranscribe(record *model.Record) {
-	log.Printf("[ASR] 开始自动转写: record=%s, audio=%s", record.ID, record.AudioFilePath)
+	log.Printf("asr_auto_transcribe_start record=%s audio=%s", record.ID, record.AudioFilePath)
 
 	// 更新状态为处理中
 	if err := h.store.UpdateRecordTranscript(record.ID, "", "PROCESSING"); err != nil {
-		log.Printf("[ASR] 更新状态失败: %v", err)
+		log.Printf("asr_auto_transcribe_status_update_failed %v", err)
 		return
 	}
 
 	// 调用 ASR 服务
 	text, err := service.TranscribeAudio(record.AudioFilePath)
 	if err != nil {
-		log.Printf("[ASR] 转写失败: record=%s, err=%v", record.ID, err)
+		log.Printf("asr_auto_transcribe_failed record=%s err=%v", record.ID, err)
 		h.store.UpdateRecordTranscript(record.ID, "", "FAILED")
 		return
 	}
 
 	// 保存转写结果
 	if err := h.store.UpdateRecordTranscript(record.ID, text, "COMPLETED"); err != nil {
-		log.Printf("[ASR] 保存转写结果失败: %v", err)
+		log.Printf("asr_auto_transcribe_save_result_failed %v", err)
 		return
 	}
 
-	log.Printf("[ASR] 转写完成: record=%s, text_len=%d", record.ID, len(text))
+	log.Printf("asr_auto_transcribe_done record=%s text_len=%d", record.ID, len(text))
 }
 
 func (h *RecordHandler) List(c *gin.Context) {

@@ -49,10 +49,10 @@ func (h *InspectionHandler) Inspect(c *gin.Context) {
 	}
 
 	// Run inspection (in background would be better, but for MVP we do it synchronously)
-	log.Printf("[LLM] 质检开始: record=%s, template_id=%d", recordID, req.TemplateID)
+	log.Printf("llm_inspection_start record=%s template_id=%d", recordID, req.TemplateID)
 	result, err := h.svc.Run(record, req.TemplateID)
 	if err != nil {
-		log.Printf("[LLM] 质检失败: record=%s, err=%v", recordID, err)
+		log.Printf("llm_inspection_failed record=%s err=%v", recordID, err)
 		h.store.UpdateRecordInspectionStatus(recordID, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "质检失败: " + err.Error()})
 		return
@@ -64,7 +64,7 @@ func (h *InspectionHandler) Inspect(c *gin.Context) {
 		return
 	}
 
-	log.Printf("[LLM] 质检完成: record=%s, conclusion=%s, score=%d, tokens=%d", recordID, result.OverallConclusion, result.OverallScore, result.TokensUsed)
+	log.Printf("llm_inspection_done record=%s conclusion=%s score=%d tokens=%d", recordID, result.OverallConclusion, result.OverallScore, result.TokensUsed)
 	c.JSON(http.StatusOK, result)
 }
 
