@@ -5,9 +5,20 @@
 
 <div class="section" style="max-width:640px">
     <p class="text-muted" style="margin-bottom:20px">
-        <i class="fas fa-info-circle"></i> 手动上传录音文件进行转写和质检，与 App 端上传字段对齐。
+        <i class="fas fa-info-circle"></i> 支持上传录音文件（自动转写）或直接录入文本（跳过转写）进行质检。
     </p>
 
+    <div class="tab-bar" style="display:flex; gap:0; margin-bottom:20px; border-bottom:2px solid var(--border, #e5e7eb);">
+        <button type="button" id="tabAudio" class="tab-btn tab-active" onclick="switchTab('audio')">
+            <i class="fas fa-file-audio"></i> 录音上传
+        </button>
+        <button type="button" id="tabText" class="tab-btn" onclick="switchTab('text')">
+            <i class="fas fa-file-alt"></i> 文本录入
+        </button>
+    </div>
+
+    <!-- ===== 音频上传 ===== -->
+    <div id="panelAudio">
     <form id="uploadForm" onsubmit="handleUpload(event)">
         <div class="form-group">
             <label><i class="fas fa-tag"></i> 标题</label>
@@ -63,11 +74,108 @@
             <i class="fas fa-cloud-upload-alt"></i> 开始上传
         </button>
     </form>
+    </div>
+
+    <!-- ===== 文本录入 ===== -->
+    <div id="panelText" style="display:none">
+    <form id="textForm" onsubmit="handleTextUpload(event)">
+        <div class="form-group">
+            <label><i class="fas fa-tag"></i> 标题</label>
+            <input type="text" id="textTitle" class="form-input" placeholder="可选">
+        </div>
+
+        <div class="form-row">
+            <div class="form-group flex-1">
+                <label><i class="fas fa-user"></i> 客户姓名 *</label>
+                <input type="text" id="textCustomerName" class="form-input" required placeholder="必填">
+            </div>
+            <div class="form-group flex-1">
+                <label><i class="fas fa-user-tie"></i> 安检员/拜访人 *</label>
+                <input type="text" id="textInspectorName" class="form-input" required placeholder="必填">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label><i class="fas fa-map-marker-alt"></i> 客户地址</label>
+            <input type="text" id="textCustomerAddress" class="form-input" placeholder="如：北京市朝阳区XX路XX号">
+        </div>
+
+        <div class="form-group">
+            <label><i class="fas fa-calendar-alt"></i> 安检/拜访日期</label>
+            <input type="date" id="textInspectionDate" class="form-input">
+        </div>
+
+        <div class="form-group">
+            <label><i class="fas fa-file-alt"></i> 拜访记录文本 *</label>
+            <textarea id="transcriptText" class="form-input" rows="10" required placeholder="直接粘贴或录入转写文本，将跳过语音转写，直接进入质检流程"></textarea>
+        </div>
+
+        <div id="textMsg" style="margin:12px 0"></div>
+
+        <button type="submit" class="btn btn-primary btn-full" id="textSubmitBtn">
+            <i class="fas fa-paper-plane"></i> 提交文本
+        </button>
+    </form>
+    </div>
 
     <div id="uploadResult" style="display:none; margin-top:20px; padding:16px; border-radius:8px;"></div>
 </div>
 
+<style>
+    .tab-btn {
+        flex: 1;
+        padding: 10px 16px;
+        border: none;
+        background: transparent;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text-muted, #6b7280);
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s;
+    }
+    .tab-btn:hover { color: var(--primary, #2563eb); }
+    .tab-active {
+        color: var(--primary, #2563eb);
+        border-bottom-color: var(--primary, #2563eb);
+    }
+</style>
+
 <script>
+function switchTab(tab) {
+    const audioPanel = document.getElementById('panelAudio');
+    const textPanel = document.getElementById('panelText');
+    const tabAudio = document.getElementById('tabAudio');
+    const tabText = document.getElementById('tabText');
+    const resultDiv = document.getElementById('uploadResult');
+    resultDiv.style.display = 'none';
+
+    if (tab === 'audio') {
+        audioPanel.style.display = 'block';
+        textPanel.style.display = 'none';
+        tabAudio.classList.add('tab-active');
+        tabText.classList.remove('tab-active');
+    } else {
+        audioPanel.style.display = 'none';
+        textPanel.style.display = 'block';
+        tabAudio.classList.remove('tab-active');
+        tabText.classList.add('tab-active');
+    }
+}
+
+function showResult(data) {
+    const resultDiv = document.getElementById('uploadResult');
+    resultDiv.style.display = 'block';
+    resultDiv.style.background = '#dcfce7';
+    resultDiv.style.border = '1px solid var(--green)';
+    resultDiv.innerHTML = `
+        <strong style="color:var(--green)"><i class="fas fa-check-circle"></i> 提交成功！</strong>
+        <p style="margin-top:8px">${data.message || ''}</p>
+        <p style="margin-top:4px">转写状态：<span class="badge badge-${data.transcript_status || 'PENDING'}">${data.transcript_status || 'PENDING'}</span></p>
+        <a href="/records/${data.record?.id || ''}" class="btn btn-primary" style="margin-top:12px"><i class="fas fa-arrow-right"></i> 查看详情</a>
+    `;
+}
+
 async function handleUpload(e) {
     e.preventDefault();
 
@@ -115,15 +223,7 @@ async function handleUpload(e) {
         const data = await resp.json();
 
         if (resp.ok) {
-            resultDiv.style.display = 'block';
-            resultDiv.style.background = '#dcfce7';
-            resultDiv.style.border = '1px solid var(--green)';
-            resultDiv.innerHTML = `
-                <strong style="color:var(--green)"><i class="fas fa-check-circle"></i> 上传成功！</strong>
-                <p style="margin-top:8px">${data.message || ''}</p>
-                <p style="margin-top:4px">转写状态：<span class="badge badge-${data.transcript_status || 'PENDING'}">${data.transcript_status || 'PENDING'}</span></p>
-                <a href="/records/${data.record?.id || ''}" class="btn btn-primary" style="margin-top:12px"><i class="fas fa-arrow-right"></i> 查看详情</a>
-            `;
+            showResult(data);
             document.getElementById('uploadForm').reset();
         } else {
             msgDiv.innerHTML = '<span style="color:var(--red)"><i class="fas fa-exclamation-circle"></i> 上传失败: ' + (data.error || '未知错误') + '</span>';
@@ -133,6 +233,58 @@ async function handleUpload(e) {
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> 开始上传';
+    }
+}
+
+async function handleTextUpload(e) {
+    e.preventDefault();
+
+    const submitBtn = document.getElementById('textSubmitBtn');
+    const msgDiv = document.getElementById('textMsg');
+    const resultDiv = document.getElementById('uploadResult');
+
+    const transcriptText = document.getElementById('transcriptText').value.trim();
+    if (!transcriptText) {
+        msgDiv.innerHTML = '<span style="color:var(--red)"><i class="fas fa-exclamation-circle"></i> 请输入拜访记录文本</span>';
+        return;
+    }
+
+    const payload = {
+        title: document.getElementById('textTitle').value,
+        description: '',
+        inspector_name: document.getElementById('textInspectorName').value,
+        customer_name: document.getElementById('textCustomerName').value,
+        customer_address: document.getElementById('textCustomerAddress').value,
+        inspection_date: document.getElementById('textInspectionDate').value + 'T00:00:00Z',
+        source_type: 'TEXT',
+        transcript_text: transcriptText,
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> 提交中...';
+    msgDiv.innerHTML = '';
+
+    try {
+        const resp = await fetch('/api/records/text', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        const data = await resp.json();
+
+        if (resp.ok) {
+            showResult(data);
+            document.getElementById('textForm').reset();
+        } else {
+            msgDiv.innerHTML = '<span style="color:var(--red)"><i class="fas fa-exclamation-circle"></i> 提交失败: ' + (data.error || '未知错误') + '</span>';
+        }
+    } catch (err) {
+        msgDiv.innerHTML = '<span style="color:var(--red)"><i class="fas fa-exclamation-circle"></i> 提交失败: ' + err.message + '</span>';
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> 提交文本';
     }
 }
 </script>

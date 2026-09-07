@@ -330,6 +330,8 @@ public class NettyHttpServer {
         // -- Records --
         if (apiPath.equals("/records") && method == HttpMethod.POST) {
             resp = handleRecordUpload(ctx, req);
+        } else if (apiPath.equals("/records/text") && method == HttpMethod.POST) {
+            resp = handleRecordTextUpload(req);
         } else if (apiPath.equals("/records") && method == HttpMethod.GET) {
             resp = handleRecordList(queryParams);
         } else if (apiPath.matches("/records/[^/]+/transcript-status") && method == HttpMethod.GET) {
@@ -677,8 +679,64 @@ public class NettyHttpServer {
         }
     }
 
+    private FullHttpResponse handleRecordTextUpload(FullHttpRequest req) {
+        try {
+            Map<String, Object> body = parseJsonBody(req);
+            String transcriptText = (String) body.get("transcript_text");
+            if (transcriptText == null || transcriptText.trim().isEmpty()) {
+                return jsonResp(400, errorMap("缺少 transcript_text 字段"));
+            }
+
+            String id = (String) body.get("id");
+            if (id == null || id.isEmpty()) id = UUID.randomUUID().toString();
+            String title = (String) body.get("title");
+            String description = (String) body.get("description");
+            String inspectorName = (String) body.get("inspector_name");
+            String customerName = (String) body.get("customer_name");
+            String customerAddress = (String) body.get("customer_address");
+            String inspectionDateStr = (String) body.get("inspection_date");
+            String sourceType = (String) body.get("source_type");
+            if (sourceType == null || sourceType.isEmpty()) sourceType = "TEXT";
+
+            LocalDateTime inspectionDate = LocalDateTime.now();
+            if (inspectionDateStr != null && !inspectionDateStr.isEmpty()) {
+                inspectionDate = parseTime(inspectionDateStr);
+            }
+
+            Record record = new Record();
+            record.id = id;
+            record.title = title;
+            record.description = description;
+            record.inspectorName = inspectorName;
+            record.customerName = customerName;
+            record.customerAddress = customerAddress;
+            record.inspectionDate = inspectionDate;
+            record.sourceType = sourceType;
+            record.audioFilePath = "";
+            record.audioDuration = 0;
+            record.transcriptText = transcriptText;
+            record.transcriptStatus = "COMPLETED";
+            record.inspectionStatus = "NONE";
+            record.createdAt = LocalDateTime.now();
+            record.updatedAt = LocalDateTime.now();
+
+            store.createRecord(record);
+
+            log.info("[TEXT] 文本记录创建成功: record={}, text_len={}", id, transcriptText.length());
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("record", record);
+            result.put("transcript_status", "COMPLETED");
+            result.put("message", "文本上传成功，可直接进行质检");
+
+            return jsonResp(200, result);
+        } catch (Exception e) {
+            log.error("文本上传失败", e);
+            return jsonResp(500, errorMap("文本上传失败: " + e.getMessage()));
+        }
+    }
+
     private void autoTranscribe(Record record) {
-        log.info("[ASR] 开始自动转写: record={}, audio={}", record.id, record.audioFilePath);
         try {
             store.updateRecordTranscript(record.id, "", "PROCESSING");
             String text = ASRService.transcribeAudio(record.audioFilePath);

@@ -36,3 +36,16 @@ type RecordCreateRequest struct {
 	InspectionDate  string `json:"inspection_date"`  // RFC3339 or "2006-01-02T15:04"
 	SourceType      string `json:"source_type"`      // RECORDING / IMPORT
 }
+
+// RecordTextCreateRequest is for direct text upload, bypassing audio + ASR
+type RecordTextCreateRequest struct {
+	ID              string `json:"id"`               // optional
+	Title           string `json:"title"`
+	Description     string `json:"description"`
+	InspectorName   string `json:"inspector_name"`
+	CustomerName    string `json:"customer_name"`
+	CustomerAddress string `json:"customer_address"`
+	InspectionDate  string `json:"inspection_date"`
+	SourceType      string `json:"source_type"`      // TEXT (default)
+	TranscriptText  string `json:"transcript_text" binding:"required"`
+}

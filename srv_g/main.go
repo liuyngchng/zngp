@@ -118,6 +118,7 @@ func main() {
 
 			// Records
 			protected.POST("/records", recordH.Upload)
+			protected.POST("/records/text", recordH.UploadText)
 			protected.GET("/records", recordH.List)
 			protected.GET("/records/:id", recordH.Get)
 			protected.DELETE("/records/:id", recordH.Delete)

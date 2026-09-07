@@ -229,6 +229,71 @@ func statusMessage(status string) string {
 	}
 }
 
+// UploadText handles JSON-only record creation with direct transcript text input.
+// Bypasses audio upload and ASR — transcript_text is provided directly.
+func (h *RecordHandler) UploadText(c *gin.Context) {
+	var req model.RecordTextCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式错误: " + err.Error()})
+		return
+	}
+
+	if req.TranscriptText == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 transcript_text 字段"})
+		return
+	}
+
+	// Generate record ID if not provided
+	recordID := req.ID
+	if recordID == "" {
+		recordID = uuid.New().String()
+	}
+
+	// Parse inspection date
+	var inspectionDate time.Time
+	if req.InspectionDate != "" {
+		inspectionDate, _ = parseTime(req.InspectionDate)
+	} else {
+		inspectionDate = time.Now()
+	}
+
+	sourceType := req.SourceType
+	if sourceType == "" {
+		sourceType = "TEXT"
+	}
+
+	record := &model.Record{
+		ID:               recordID,
+		Title:            req.Title,
+		Description:      req.Description,
+		InspectorName:    req.InspectorName,
+		CustomerName:     req.CustomerName,
+		CustomerAddress:  req.CustomerAddress,
+		InspectionDate:   inspectionDate,
+		SourceType:       sourceType,
+		AudioFilePath:    "",
+		AudioDuration:    0,
+		TranscriptText:   req.TranscriptText,
+		TranscriptStatus: "COMPLETED",
+		InspectionStatus: "NONE",
+		CreatedAt:        time.Now(),
+		UpdatedAt:        time.Now(),
+	}
+
+	if err := h.store.CreateRecord(record); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建记录失败: " + err.Error()})
+		return
+	}
+
+	logx.Info("text_upload_done", "record", recordID, "text_len", len(req.TranscriptText))
+
+	c.JSON(http.StatusOK, gin.H{
+		"record":            record,
+		"transcript_status": "COMPLETED",
+		"message":           "文本上传成功，可直接进行质检",
+	})
+}
+
 func (h *RecordHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.store.DeleteRecord(id); err != nil {
