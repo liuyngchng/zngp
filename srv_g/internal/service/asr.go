@@ -7,13 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/zngp/server/config"
+	"github.com/zngp/server/internal/logx"
 )
 
 // ASRResponse is the OpenAI-compatible response from qwen3-asr-flash
@@ -89,7 +89,7 @@ func TranscribeAudio(audioPath string) (string, error) {
 	httpReq.Header.Set("Authorization", "Bearer "+cfg.ASR.APIKey)
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	log.Printf("asr_request_start url=%s model=%s audio_size=%d audio_path=%s", apiURL, cfg.ASR.Model, len(data), audioPath)
+	logx.Info("asr_request_start", "url", apiURL, "model", cfg.ASR.Model, "audio_size", len(data), "audio_path", audioPath)
 	startTime := time.Now()
 
 	client := createDirectClient()
@@ -97,40 +97,40 @@ func TranscribeAudio(audioPath string) (string, error) {
 	resp, err := client.Do(httpReq)
 	elapsed := time.Since(startTime)
 	if err != nil {
-		log.Printf("asr_request_failed url=%s err=%v elapsed=%v", apiURL, err, elapsed)
+		logx.Error("asr_request_failed", "url", apiURL, "err", err, "elapsed", elapsed)
 		return "", fmt.Errorf("ASR API 请求失败: %w", err)
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("asr_read_response_failed err=%v elapsed=%v", err, elapsed)
+		logx.Error("asr_read_response_failed", "err", err, "elapsed", elapsed)
 		return "", fmt.Errorf("读取响应失败: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("asr_api_http_error url=%s status=%d body=%s elapsed=%v", apiURL, resp.StatusCode, string(bodyBytes), elapsed)
+		logx.Error("asr_api_http_error", "url", apiURL, "status", resp.StatusCode, "body", string(bodyBytes), "elapsed", elapsed)
 		return "", fmt.Errorf("ASR API 返回错误 (%d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var asrResp ASRResponse
 	if err := json.Unmarshal(bodyBytes, &asrResp); err != nil {
-		log.Printf("asr_json_parse_failed err=%v body=%s elapsed=%v", err, string(bodyBytes), elapsed)
+		logx.Error("asr_json_parse_failed", "err", err, "body", string(bodyBytes), "elapsed", elapsed)
 		return "", fmt.Errorf("解析响应失败: %w", err)
 	}
 
 	if asrResp.Error != nil {
-		log.Printf("asr_api_biz_error err=%s elapsed=%v", asrResp.Error.Message, elapsed)
+		logx.Error("asr_api_biz_error", "err", asrResp.Error.Message, "elapsed", elapsed)
 		return "", fmt.Errorf("ASR 错误: %s", asrResp.Error.Message)
 	}
 
 	if len(asrResp.Choices) == 0 {
-		log.Printf("asr_empty_result elapsed=%v", elapsed)
+		logx.Error("asr_empty_result", "elapsed", elapsed)
 		return "", fmt.Errorf("ASR 返回空结果")
 	}
 
 	text := asrResp.Choices[0].Message.Content
-	log.Printf("asr_request_success text_len=%d elapsed=%v", len(text), elapsed)
+	logx.Info("asr_request_success", "text_len", len(text), "elapsed", elapsed)
 	return text, nil
 }
 

@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/zngp/server/internal/logx"
 	"github.com/zngp/server/internal/service"
 	"github.com/zngp/server/internal/store"
 )
@@ -39,10 +39,10 @@ func (h *ASRHandler) Transcribe(c *gin.Context) {
 	}
 
 	// Run ASR
-	log.Printf("asr_manual_transcribe_start record=%s audio=%s", recordID, record.AudioFilePath)
+	logx.Info("asr_manual_transcribe_start", "record", recordID, "audio", record.AudioFilePath)
 	text, err := service.TranscribeAudio(record.AudioFilePath)
 	if err != nil {
-		log.Printf("asr_manual_transcribe_failed record=%s err=%v", recordID, err)
+		logx.Error("asr_manual_transcribe_failed", "record", recordID, "err", err)
 		h.store.UpdateRecordTranscript(recordID, "", "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "转写失败: " + err.Error()})
 		return
@@ -50,12 +50,12 @@ func (h *ASRHandler) Transcribe(c *gin.Context) {
 
 	// Save transcript
 	if err := h.store.UpdateRecordTranscript(recordID, text, "COMPLETED"); err != nil {
-		log.Printf("asr_manual_transcribe_save_failed record=%s err=%v", recordID, err)
+		logx.Error("asr_manual_transcribe_save_failed", "record", recordID, "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存转写结果失败"})
 		return
 	}
 
-	log.Printf("asr_manual_transcribe_done record=%s text_len=%d", recordID, len(text))
+	logx.Info("asr_manual_transcribe_done", "record", recordID, "text_len", len(text))
 	c.JSON(http.StatusOK, gin.H{
 		"record_id":  recordID,
 		"transcript": text,

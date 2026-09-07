@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/zngp/server/config"
+	"github.com/zngp/server/internal/logx"
 )
 
 // LLMRequest is an OpenAI-compatible chat completion request
@@ -72,7 +72,7 @@ func ChatCompletion(systemPrompt, userPrompt string) (string, int, error) {
 	httpReq.Header.Set("Authorization", "Bearer "+cfg.LLM.APIKey)
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	log.Printf("llm_request_start url=%s model=%s system_prompt_len=%d user_prompt_len=%d", apiURL, cfg.LLM.Model, len(systemPrompt), len(userPrompt))
+	logx.Info("llm_request_start", "url", apiURL, "model", cfg.LLM.Model, "system_prompt_len", len(systemPrompt), "user_prompt_len", len(userPrompt))
 	startTime := time.Now()
 
 	client := &http.Client{
@@ -83,35 +83,35 @@ func ChatCompletion(systemPrompt, userPrompt string) (string, int, error) {
 	resp, err := client.Do(httpReq)
 	elapsed := time.Since(startTime)
 	if err != nil {
-		log.Printf("llm_request_failed url=%s err=%v elapsed=%v", apiURL, err, elapsed)
+		logx.Error("llm_request_failed", "url", apiURL, "err", err, "elapsed", elapsed)
 		return "", 0, fmt.Errorf("LLM API 请求失败: %w", err)
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("llm_read_response_failed err=%v elapsed=%v", err, elapsed)
+		logx.Error("llm_read_response_failed", "err", err, "elapsed", elapsed)
 		return "", 0, fmt.Errorf("读取响应失败: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("llm_api_http_error url=%s status=%d body=%s elapsed=%v", apiURL, resp.StatusCode, string(bodyBytes), elapsed)
+		logx.Error("llm_api_http_error", "url", apiURL, "status", resp.StatusCode, "body", string(bodyBytes), "elapsed", elapsed)
 		return "", 0, fmt.Errorf("LLM API 返回错误 (%d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var llmResp LLMResponse
 	if err := json.Unmarshal(bodyBytes, &llmResp); err != nil {
-		log.Printf("llm_json_parse_failed err=%v body=%s elapsed=%v", err, string(bodyBytes), elapsed)
+		logx.Error("llm_json_parse_failed", "err", err, "body", string(bodyBytes), "elapsed", elapsed)
 		return "", 0, fmt.Errorf("解析响应失败: %w", err)
 	}
 
 	if llmResp.Error != nil {
-		log.Printf("llm_api_biz_error err=%s elapsed=%v", llmResp.Error.Message, elapsed)
+		logx.Error("llm_api_biz_error", "err", llmResp.Error.Message, "elapsed", elapsed)
 		return "", 0, fmt.Errorf("LLM 错误: %s", llmResp.Error.Message)
 	}
 
 	if len(llmResp.Choices) == 0 {
-		log.Printf("llm_empty_result elapsed=%v", elapsed)
+		logx.Error("llm_empty_result", "elapsed", elapsed)
 		return "", 0, fmt.Errorf("LLM 返回空结果")
 	}
 
@@ -120,7 +120,7 @@ func ChatCompletion(systemPrompt, userPrompt string) (string, int, error) {
 		tokens = llmResp.Usage.TotalTokens
 	}
 
-	log.Printf("llm_request_success response_len=%d tokens=%d elapsed=%v", len(llmResp.Choices[0].Message.Content), tokens, elapsed)
+	logx.Info("llm_request_success", "response_len", len(llmResp.Choices[0].Message.Content), "tokens", tokens, "elapsed", elapsed)
 	return llmResp.Choices[0].Message.Content, tokens, nil
 }
 

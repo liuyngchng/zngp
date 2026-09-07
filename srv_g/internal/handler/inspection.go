@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/zngp/server/internal/logx"
 	"github.com/zngp/server/internal/service"
 	"github.com/zngp/server/internal/store"
 )
@@ -49,10 +49,10 @@ func (h *InspectionHandler) Inspect(c *gin.Context) {
 	}
 
 	// Run inspection (in background would be better, but for MVP we do it synchronously)
-	log.Printf("llm_inspection_start record=%s template_id=%d", recordID, req.TemplateID)
+	logx.Info("llm_inspection_start", "record", recordID, "template_id", req.TemplateID)
 	result, err := h.svc.Run(record, req.TemplateID)
 	if err != nil {
-		log.Printf("llm_inspection_failed record=%s err=%v", recordID, err)
+		logx.Error("llm_inspection_failed", "record", recordID, "err", err)
 		h.store.UpdateRecordInspectionStatus(recordID, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "质检失败: " + err.Error()})
 		return
@@ -64,7 +64,7 @@ func (h *InspectionHandler) Inspect(c *gin.Context) {
 		return
 	}
 
-	log.Printf("llm_inspection_done record=%s conclusion=%s score=%d tokens=%d", recordID, result.OverallConclusion, result.OverallScore, result.TokensUsed)
+	logx.Info("llm_inspection_done", "record", recordID, "conclusion", result.OverallConclusion, "score", result.OverallScore, "tokens", result.TokensUsed)
 	c.JSON(http.StatusOK, result)
 }
 

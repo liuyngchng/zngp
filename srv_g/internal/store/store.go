@@ -1,11 +1,11 @@
 package store
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/glebarez/sqlite"
+	"github.com/zngp/server/internal/logx"
 	"github.com/zngp/server/internal/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -52,6 +52,6 @@ func (s *Store) Migrate() error {
 	); err != nil {
 		return err
 	}
-	log.Println("db_migration_done")
+	logx.Info("db_migration_done")
 	return nil
 }

@@ -421,6 +421,9 @@ public class NettyHttpServer {
         if (path.equals("/login")) {
             resp = renderLogin();
         } else if (path.equals("/logout")) {
+            if (auth.username != null && !auth.username.isEmpty()) {
+                log.info("User '{}' logged out", auth.username);
+            }
             resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.FOUND);
             clearTokenCookie(resp);
             resp.headers().set(HttpHeaderNames.LOCATION, "/login");
@@ -484,22 +487,27 @@ public class NettyHttpServer {
             String password = (String) body.get("password");
 
             if (username == null || password == null) {
+                log.warn("Login failed: missing parameters");
                 return jsonResp(400, errorMap("请输入用户名和密码"));
             }
 
             User user = store.findUserByUsername(username);
             if (user == null || !BCrypt.checkpw(password, user.passwordHash)) {
+                log.warn("Login failed for user '{}': wrong username or password", username);
                 return jsonResp(401, errorMap("用户名或密码错误"));
             }
 
             // Check if initial password has expired
             if (user.mustChangePassword && user.passwordExpiresAt != null) {
                 if (LocalDateTime.now().isAfter(user.passwordExpiresAt)) {
+                    log.warn("Login failed for user '{}': initial password expired", username);
                     return jsonResp(401, errorMap("初始密码已过期，请联系管理员重置"));
                 }
             }
 
             String token = JwtUtil.generateTokenWithFlags(user.id, user.username, user.mustChangePassword);
+
+            log.info("User '{}' logged in successfully, mustChangePassword={}", username, user.mustChangePassword);
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("token", token);
@@ -512,7 +520,7 @@ public class NettyHttpServer {
             setTokenCookie(resp, token);
             return resp;
         } catch (Exception e) {
-            log.error("登录失败", e);
+            log.error("Login failed: system error", e);
             return jsonResp(500, errorMap("登录失败: " + e.getMessage()));
         }
     }
@@ -524,28 +532,33 @@ public class NettyHttpServer {
             String newPassword = (String) body.get("new_password");
 
             if (oldPassword == null || newPassword == null || newPassword.length() < 6) {
+                log.warn("User '{}' password change failed: invalid parameters", auth.username);
                 return jsonResp(400, errorMap("请输入旧密码和新密码（新密码至少6位）"));
             }
 
             User user = store.findUserByUsername(auth.username);
             if (user == null || !BCrypt.checkpw(oldPassword, user.passwordHash)) {
+                log.warn("User '{}' password change failed: wrong old password", auth.username);
                 return jsonResp(401, errorMap("旧密码错误"));
             }
 
             String hash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
             store.updateUserPassword(auth.userId, hash);
 
-            // Issue a new token without must_change_password
+            log.info("User '{}' (id={}) changed password successfully", auth.username, auth.userId);
+
+            // Issue a new token without must_change_password and update auth in-place
+            // so the generic code below sets the correct cookie
             String newToken = JwtUtil.generateTokenWithFlags(auth.userId, auth.username, false);
+            auth.token = newToken;
+            auth.mustChangePassword = false;
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("message", "密码修改成功");
             result.put("token", newToken);
-            FullHttpResponse resp = jsonResp(200, result);
-            setTokenCookie(resp, newToken);
-            return resp;
+            return jsonResp(200, result);
         } catch (Exception e) {
-            log.error("修改密码失败", e);
+            log.error("User '{}' password change failed: database error", auth.username, e);
             return jsonResp(500, errorMap("密码修改失败: " + e.getMessage()));
         }
     }

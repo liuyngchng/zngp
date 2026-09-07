@@ -17,8 +17,10 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port string `yaml:"port"`
-	Host string `yaml:"host"`
+	Port      string `yaml:"port"`
+	Host      string `yaml:"host"`
+	LogLevel  string `yaml:"log_level"`
+	LogFormat string `yaml:"log_format"`
 }
 
 type SystemConfig struct {
@@ -74,6 +76,12 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Server.Host == "" {
 		cfg.Server.Host = "0.0.0.0"
+	}
+	if cfg.Server.LogLevel == "" {
+		cfg.Server.LogLevel = "info"
+	}
+	if cfg.Server.LogFormat == "" {
+		cfg.Server.LogFormat = "text"
 	}
 	if cfg.System.Name == "" {
 		cfg.System.Name = "ZNGP 服务质量平台"

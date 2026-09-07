@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"html/template"
-	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/zngp/server/config"
 	"github.com/zngp/server/internal/handler"
+	"github.com/zngp/server/internal/logx"
 	"github.com/zngp/server/internal/middleware"
 	"github.com/zngp/server/internal/store"
 )
@@ -24,24 +25,28 @@ func main() {
 
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		log.Fatalf("config_load_failed %v", err)
+		fmt.Fprintf(os.Stderr, "config_load_failed: %v\n", err)
+		os.Exit(1)
 	}
+
+	// Initialize logging (level: debug/info/warn/error, format: text/json)
+	logx.Init(logx.Level(cfg.Server.LogLevel), cfg.Server.LogFormat)
 
 	// Initialize store
 	st, err := store.New(cfg.Database.Path)
 	if err != nil {
-		log.Fatalf("store_init_failed %v", err)
+		logx.Fatal("store_init_failed", "err", err)
 	}
 
 	// Ensure default admin user
 	if err := handler.EnsureDefaultAdmin(st); err != nil {
-		log.Fatalf("default_admin_create_failed %v", err)
+		logx.Fatal("default_admin_create_failed", "err", err)
 	}
-	log.Println("default_admin_ready")
+	logx.Info("default_admin_ready")
 
 	// Seed templates (if not existed)
 	if err := SeedTemplates(st); err != nil {
-		log.Printf("seed_template_insert_failed %v", err)
+		logx.Error("seed_template_insert_failed", "err", err)
 	}
 
 	// Initialize handlers
@@ -160,6 +165,12 @@ func main() {
 	// Web pages
 	r.GET("/login", webH.LoginPage)
 	r.GET("/logout", func(c *gin.Context) {
+		// Try to extract username from token for logging
+		if tokenStr := middleware.ExtractTokenFromRequest(c); tokenStr != "" {
+			if claims, err := middleware.ParseToken(tokenStr); err == nil {
+				logx.Info("user_logged_out", "username", claims.Username)
+			}
+		}
 		middleware.ClearTokenCookie(c)
 		c.Redirect(302, "/login")
 	})
@@ -176,16 +187,58 @@ func main() {
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		<-quit
-		log.Println("server_shutting_down")
+		logx.Info("server_shutting_down")
 		os.Exit(0)
 	}()
 
 	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
-	log.Printf("server_starting_http %s", addr)
-	log.Printf("server_local_access_127_0_0_1 %s", cfg.Server.Port)
+	logx.Info("server_starting_http", "addr", addr)
+	printAccessURLs(cfg.Server.Host, cfg.Server.Port)
 	if err := r.Run(addr); err != nil {
-		log.Fatalf("server_run_failed %v", err)
+		logx.Fatal("server_run_failed", "err", err)
 	}
+}
+
+// printAccessURLs lists all local IP addresses with clickable access URLs.
+func printAccessURLs(host, port string) {
+	ips := collectLocalIPs()
+	if len(ips) == 0 {
+		logx.Info("server_access_url", "url", fmt.Sprintf("http://127.0.0.1:%s", port))
+		return
+	}
+	for _, ip := range ips {
+		logx.Info("server_access_url", "url", fmt.Sprintf("http://%s:%s", ip, port))
+	}
+}
+
+// collectLocalIPs returns all non-loopback IPv4 addresses on this machine,
+// plus 127.0.0.1 (and ::1) so local access always works.
+func collectLocalIPs() []string {
+	var ips []string
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return []string{"127.0.0.1"}
+	}
+	for _, addr := range addrs {
+		var ip net.IP
+		switch v := addr.(type) {
+		case *net.IPNet:
+			ip = v.IP
+		case *net.IPAddr:
+			ip = v.IP
+		}
+		if ip == nil {
+			continue
+		}
+		ip = ip.To4()
+		if ip == nil || ip.IsLoopback() {
+			continue
+		}
+		ips = append(ips, ip.String())
+	}
+	// Always include loopback first
+	ips = append([]string{"127.0.0.1"}, ips...)
+	return ips
 }
 
 // SeedTemplates creates default inspection templates if they don't exist
@@ -204,6 +257,6 @@ func SeedTemplates(st *store.Store) error {
 			return err
 		}
 	}
-	log.Println("templates_seeded")
+	logx.Info("templates_seeded")
 	return nil
 }

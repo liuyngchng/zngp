@@ -161,7 +161,7 @@ public class Store {
     // ---- User methods ----
 
     public User findUserByUsername(String username) throws SQLException {
-        String sql = "SELECT id, username, password_hash, role, created_at FROM users WHERE username = ?";
+        String sql = "SELECT id, username, password_hash, role, must_change_password, password_expires_at, created_at FROM users WHERE username = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, username);
             try (ResultSet rs = ps.executeQuery()) {

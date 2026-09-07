@@ -36,7 +36,7 @@
 
             <form id="changePwdForm" class="login-form" style="display:none;">
                 <div class="login-header" style="margin-bottom:12px;">
-                    <h2 style="font-size:1.2rem;color:#333;">首次登录，请修改密码</h2>
+                    <h2 style="font-size:1.2rem;color:#fff;">首次登录，请修改密码</h2>
                 </div>
                 <div class="login-error" id="changePwdError" style="display:none;">
                     <i class="fas fa-exclamation-circle"></i> <span id="changePwdErrorMsg"></span>
@@ -136,20 +136,6 @@
 
         document.getElementById('loginForm').addEventListener('submit', doLogin);
         document.getElementById('changePwdForm').addEventListener('submit', doChangePassword);
-
-        // 如果已有 token 但需要修改密码，直接显示密码修改表单
-        (async function checkMustChange() {
-            try {
-                const resp = await fetch('/api/auth/status');
-                const data = await resp.json();
-                if (resp.ok && data.must_change_password) {
-                    document.getElementById('loginForm').style.display = 'none';
-                    document.getElementById('changePwdForm').style.display = 'block';
-                }
-            } catch (e) {
-                // 未登录，忽略
-            }
-        })();
     </script>
 </body>
 </html>
