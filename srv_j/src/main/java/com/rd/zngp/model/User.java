@@ -24,6 +24,13 @@ public class User {
     @JsonProperty("role")
     public String role = "admin";
 
+    @JsonProperty("must_change_password")
+    public boolean mustChangePassword = false;
+
+    @JsonProperty("password_expires_at")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    public LocalDateTime passwordExpiresAt;
+
     @JsonProperty("created_at")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     public LocalDateTime createdAt;

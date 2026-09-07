@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/zngp/server/config"
+	"github.com/zngp/server/internal/middleware"
 	"github.com/zngp/server/internal/model"
 	"github.com/zngp/server/internal/store"
 )
@@ -146,7 +147,18 @@ func (h *WebHandler) TemplateEditPage(c *gin.Context) {
 
 // LoginPage renders the login page
 func (h *WebHandler) LoginPage(c *gin.Context) {
-	c.HTML(http.StatusOK, "login.html", gin.H{"title": "登录"})
+	// Check if user already has a valid token but needs to change password
+	mustChange := false
+	tokenStr := middleware.ExtractTokenFromRequest(c)
+	if tokenStr != "" {
+		if claims, err := middleware.ParseToken(tokenStr); err == nil && claims.MustChangePassword {
+			mustChange = true
+		}
+	}
+	c.HTML(http.StatusOK, "login.html", gin.H{
+		"title":           "登录",
+		"mustChange":      mustChange,
+	})
 }
 
 // ConfigPage renders the config page

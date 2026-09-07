@@ -174,12 +174,14 @@ public class NettyHttpServer {
         long userId;
         String username;
         String token;
+        boolean mustChangePassword;
 
-        AuthInfo(boolean valid, long userId, String username, String token) {
+        AuthInfo(boolean valid, long userId, String username, String token, boolean mustChangePassword) {
             this.valid = valid;
             this.userId = userId;
             this.username = username;
             this.token = token;
+            this.mustChangePassword = mustChangePassword;
         }
     }
 
@@ -211,15 +213,17 @@ public class NettyHttpServer {
                 Claims claims = JwtUtil.parseToken(token);
                 long userId = ((Number) claims.get("user_id")).longValue();
                 String username = (String) claims.get("username");
+                boolean mustChange = claims.get("must_change_password") != null
+                    && Boolean.TRUE.equals(claims.get("must_change_password"));
                 // Generate a new token for sliding expiration
-                String newToken = JwtUtil.generateToken(userId, username);
-                return new AuthInfo(true, userId, username, newToken);
+                String newToken = JwtUtil.generateTokenWithFlags(userId, username, mustChange);
+                return new AuthInfo(true, userId, username, newToken, mustChange);
             } catch (Exception e) {
                 // token invalid
             }
         }
 
-        return new AuthInfo(false, 0, "", null);
+        return new AuthInfo(false, 0, "", null, false);
     }
 
     private void setTokenCookie(FullHttpResponse resp, String token) {
@@ -310,6 +314,16 @@ public class NettyHttpServer {
             return;
         }
 
+        // Force password change: only allow change-password and status endpoints
+        if (auth.mustChangePassword && !apiPath.equals("/auth/change-password") && !apiPath.equals("/auth/status")) {
+            Map<String, Object> err = new LinkedHashMap<>();
+            err.put("error", "首次登录必须修改密码");
+            err.put("must_change_password", true);
+            FullHttpResponse resp = jsonResp(403, err);
+            sendAndClose(ctx, req, resp);
+            return;
+        }
+
         // Add sliding expiration header
         FullHttpResponse resp;
 
@@ -369,6 +383,8 @@ public class NettyHttpServer {
         // -- Auth --
         else if (apiPath.equals("/auth/change-password") && method == HttpMethod.POST) {
             resp = handleChangePassword(req, auth);
+        } else if (apiPath.equals("/auth/status") && method == HttpMethod.GET) {
+            resp = handleAuthStatus(auth);
         }
         // -- Stats --
         else if (apiPath.equals("/stats/overview") && method == HttpMethod.GET) {
@@ -409,6 +425,10 @@ public class NettyHttpServer {
             clearTokenCookie(resp);
             resp.headers().set(HttpHeaderNames.LOCATION, "/login");
         } else if (!auth.valid) {
+            resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.FOUND);
+            resp.headers().set(HttpHeaderNames.LOCATION, "/login");
+        } else if (auth.mustChangePassword) {
+            // Force password change: redirect to login page (which hosts the change form)
             resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.FOUND);
             resp.headers().set(HttpHeaderNames.LOCATION, "/login");
         } else {
@@ -472,11 +492,21 @@ public class NettyHttpServer {
                 return jsonResp(401, errorMap("用户名或密码错误"));
             }
 
-            String token = JwtUtil.generateToken(user.id, user.username);
+            // Check if initial password has expired
+            if (user.mustChangePassword && user.passwordExpiresAt != null) {
+                if (LocalDateTime.now().isAfter(user.passwordExpiresAt)) {
+                    return jsonResp(401, errorMap("初始密码已过期，请联系管理员重置"));
+                }
+            }
+
+            String token = JwtUtil.generateTokenWithFlags(user.id, user.username, user.mustChangePassword);
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("token", token);
             result.put("username", user.username);
+            if (user.mustChangePassword) {
+                result.put("must_change_password", true);
+            }
 
             FullHttpResponse resp = jsonResp(200, result);
             setTokenCookie(resp, token);
@@ -505,13 +535,26 @@ public class NettyHttpServer {
             String hash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
             store.updateUserPassword(auth.userId, hash);
 
+            // Issue a new token without must_change_password
+            String newToken = JwtUtil.generateTokenWithFlags(auth.userId, auth.username, false);
+
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("message", "密码修改成功");
-            return jsonResp(200, result);
+            result.put("token", newToken);
+            FullHttpResponse resp = jsonResp(200, result);
+            setTokenCookie(resp, newToken);
+            return resp;
         } catch (Exception e) {
             log.error("修改密码失败", e);
             return jsonResp(500, errorMap("密码修改失败: " + e.getMessage()));
         }
+    }
+
+    private FullHttpResponse handleAuthStatus(AuthInfo auth) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("username", auth.username);
+        result.put("must_change_password", auth.mustChangePassword);
+        return jsonResp(200, result);
     }
 
     // -- Records --

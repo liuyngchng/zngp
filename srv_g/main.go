@@ -109,6 +109,7 @@ func main() {
 		protected := api.Group("", middleware.AuthRequired())
 		{
 			protected.POST("/auth/change-password", authH.ChangePassword)
+			protected.GET("/auth/status", authH.Status)
 
 			// Records
 			protected.POST("/records", recordH.Upload)

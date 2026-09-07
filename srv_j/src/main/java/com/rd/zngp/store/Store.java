@@ -63,6 +63,8 @@ public class Store {
                 "username TEXT UNIQUE NOT NULL," +
                 "password_hash TEXT NOT NULL," +
                 "role TEXT DEFAULT 'admin'," +
+                "must_change_password INTEGER DEFAULT 0," +
+                "password_expires_at TEXT," +
                 "created_at TEXT DEFAULT (datetime('now'))" +
                 ")");
 
@@ -129,6 +131,14 @@ public class Store {
                 "confidence REAL DEFAULT 0," +
                 "ai_reasoning TEXT" +
                 ")");
+
+            // Migrate existing tables: add new columns if missing
+            try {
+                stmt.execute("ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE users ADD COLUMN password_expires_at TEXT");
+            } catch (SQLException ignored) {}
         }
         log.info("数据库迁移完成");
     }
@@ -171,18 +181,20 @@ public class Store {
     }
 
     public void createUser(User user) throws SQLException {
-        String sql = "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)";
+        String sql = "INSERT INTO users (username, password_hash, role, must_change_password, password_expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, user.username);
             ps.setString(2, user.passwordHash);
             ps.setString(3, user.role);
-            ps.setString(4, now());
+            ps.setInt(4, user.mustChangePassword ? 1 : 0);
+            ps.setString(5, user.passwordExpiresAt != null ? user.passwordExpiresAt.format(DTF) : null);
+            ps.setString(6, now());
             ps.executeUpdate();
         }
     }
 
     public void updateUserPassword(long userId, String hash) throws SQLException {
-        String sql = "UPDATE users SET password_hash = ? WHERE id = ?";
+        String sql = "UPDATE users SET password_hash = ?, must_change_password = 0, password_expires_at = NULL WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, hash);
             ps.setLong(2, userId);
@@ -196,6 +208,8 @@ public class Store {
         u.username = rs.getString("username");
         u.passwordHash = rs.getString("password_hash");
         u.role = rs.getString("role");
+        u.mustChangePassword = rs.getInt("must_change_password") != 0;
+        u.passwordExpiresAt = parseDT(rs.getString("password_expires_at"));
         u.createdAt = parseDT(rs.getString("created_at"));
         return u;
     }

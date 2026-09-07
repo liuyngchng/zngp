@@ -34,6 +34,27 @@
                 </button>
             </form>
 
+            <form id="changePwdForm" class="login-form" style="display:none;">
+                <div class="login-header" style="margin-bottom:12px;">
+                    <h2 style="font-size:1.2rem;color:#333;">首次登录，请修改密码</h2>
+                </div>
+                <div class="login-error" id="changePwdError" style="display:none;">
+                    <i class="fas fa-exclamation-circle"></i> <span id="changePwdErrorMsg"></span>
+                </div>
+                <input type="hidden" id="old_password" name="old_password">
+                <div class="login-field">
+                    <label><i class="fas fa-key"></i> 新密码</label>
+                    <input type="password" id="new_password" name="new_password" required placeholder="请输入新密码（至少6位）" autocomplete="new-password">
+                </div>
+                <div class="login-field">
+                    <label><i class="fas fa-check-circle"></i> 确认新密码</label>
+                    <input type="password" id="confirm_password" name="confirm_password" required placeholder="请再次输入新密码" autocomplete="new-password">
+                </div>
+                <button type="submit" class="login-btn">
+                    <i class="fas fa-save"></i> 修改密码
+                </button>
+            </form>
+
             <div class="login-footer">
                 <p>{{sysName}} · 语音质检管理系统</p>
             </div>
@@ -53,11 +74,18 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({username, password})
                 });
+                const data = await resp.json();
                 if (resp.ok) {
-                    // 服务端已通过 Set-Cookie 写入 token，直接跳转
-                    window.location.href = '/';
+                    if (data.must_change_password) {
+                        // 首次登录：显示修改密码表单
+                        document.getElementById('loginForm').style.display = 'none';
+                        document.getElementById('changePwdForm').style.display = 'block';
+                        document.getElementById('old_password').value = password;
+                    } else {
+                        // 服务端已通过 Set-Cookie 写入 token，直接跳转
+                        window.location.href = '/';
+                    }
                 } else {
-                    const data = await resp.json();
                     errMsg.textContent = data.error || '登录失败';
                     errEl.style.display = 'flex';
                 }
@@ -66,7 +94,62 @@
                 errEl.style.display = 'flex';
             }
         }
+
+        async function doChangePassword(e) {
+            e.preventDefault();
+            const oldPassword = document.getElementById('old_password').value;
+            const newPassword = document.getElementById('new_password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+            const errEl = document.getElementById('changePwdError');
+            const errMsg = document.getElementById('changePwdErrorMsg');
+
+            if (newPassword.length < 6) {
+                errMsg.textContent = '新密码至少需要6位';
+                errEl.style.display = 'flex';
+                return;
+            }
+            if (newPassword !== confirmPassword) {
+                errMsg.textContent = '两次输入的新密码不一致';
+                errEl.style.display = 'flex';
+                return;
+            }
+
+            try {
+                const resp = await fetch('/api/auth/change-password', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({old_password: oldPassword, new_password: newPassword})
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    // 修改成功，服务端已写入新 token，跳转首页
+                    window.location.href = '/';
+                } else {
+                    errMsg.textContent = data.error || '修改密码失败';
+                    errEl.style.display = 'flex';
+                }
+            } catch (err) {
+                errMsg.textContent = '网络错误，请检查服务器连接';
+                errEl.style.display = 'flex';
+            }
+        }
+
         document.getElementById('loginForm').addEventListener('submit', doLogin);
+        document.getElementById('changePwdForm').addEventListener('submit', doChangePassword);
+
+        // 如果已有 token 但需要修改密码，直接显示密码修改表单
+        (async function checkMustChange() {
+            try {
+                const resp = await fetch('/api/auth/status');
+                const data = await resp.json();
+                if (resp.ok && data.must_change_password) {
+                    document.getElementById('loginForm').style.display = 'none';
+                    document.getElementById('changePwdForm').style.display = 'block';
+                }
+            } catch (e) {
+                // 未登录，忽略
+            }
+        })();
     </script>
 </body>
 </html>

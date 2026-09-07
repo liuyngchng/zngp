@@ -18,15 +18,21 @@ var (
 const CookieName = "zngp_token"
 
 type Claims struct {
-	UserID   int64  `json:"user_id"`
-	Username string `json:"username"`
+	UserID             int64  `json:"user_id"`
+	Username           string `json:"username"`
+	MustChangePassword bool   `json:"must_change_password,omitempty"`
 	jwt.RegisteredClaims
 }
 
 func GenerateToken(userID int64, username string) (string, error) {
+	return GenerateTokenWithFlags(userID, username, false)
+}
+
+func GenerateTokenWithFlags(userID int64, username string, mustChangePassword bool) (string, error) {
 	claims := &Claims{
-		UserID:   userID,
-		Username: username,
+		UserID:             userID,
+		Username:           username,
+		MustChangePassword: mustChangePassword,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(72 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -59,8 +65,8 @@ func ClearTokenCookie(c *gin.Context) {
 	c.SetCookie(CookieName, "", -1, "/", "", false, true)
 }
 
-// extractToken tries to get the JWT from Authorization header, then Cookie
-func extractToken(c *gin.Context) string {
+// ExtractTokenFromRequest tries to get the JWT from Authorization header, then Cookie
+func ExtractTokenFromRequest(c *gin.Context) string {
 	// Header first (for API calls from App)
 	header := c.GetHeader("Authorization")
 	if header != "" {
@@ -79,9 +85,10 @@ func extractToken(c *gin.Context) string {
 // AuthRequired extracts the JWT token from Header or Cookie.
 // On success, issues a refreshed token (sliding expiration)
 // in both X-New-Token header and Set-Cookie.
+// If the user must change password, only /api/auth/change-password is allowed.
 func AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tokenStr := extractToken(c)
+		tokenStr := ExtractTokenFromRequest(c)
 		if tokenStr == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
 			return
@@ -95,9 +102,19 @@ func AuthRequired() gin.HandlerFunc {
 
 		c.Set("user_id", claims.UserID)
 		c.Set("username", claims.Username)
+		c.Set("must_change_password", claims.MustChangePassword)
+
+		// If must change password, only allow the change-password and status endpoints
+		if claims.MustChangePassword && c.Request.URL.Path != "/api/auth/change-password" && c.Request.URL.Path != "/api/auth/status" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error":                "首次登录必须修改密码",
+				"must_change_password": true,
+			})
+			return
+		}
 
 		// 滑动续期
-		newToken, _ := GenerateToken(claims.UserID, claims.Username)
+		newToken, _ := GenerateTokenWithFlags(claims.UserID, claims.Username, claims.MustChangePassword)
 		c.Header("X-New-Token", newToken)
 		SetTokenCookie(c, newToken)
 
@@ -107,9 +124,10 @@ func AuthRequired() gin.HandlerFunc {
 
 // AuthWebRequired redirects to /login if not authenticated.
 // Supports both Cookie (browser) and Header (JS fetch) auth.
+// If the user must change password, redirects to /login?must_change=1.
 func AuthWebRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tokenStr := extractToken(c)
+		tokenStr := ExtractTokenFromRequest(c)
 		if tokenStr == "" {
 			c.Redirect(http.StatusFound, "/login")
 			c.Abort()
@@ -126,9 +144,17 @@ func AuthWebRequired() gin.HandlerFunc {
 
 		c.Set("user_id", claims.UserID)
 		c.Set("username", claims.Username)
+		c.Set("must_change_password", claims.MustChangePassword)
+
+		// If must change password, redirect to login page (which hosts the change form)
+		if claims.MustChangePassword {
+			c.Redirect(http.StatusFound, "/login")
+			c.Abort()
+			return
+		}
 
 		// 滑动续期
-		newToken, _ := GenerateToken(claims.UserID, claims.Username)
+		newToken, _ := GenerateTokenWithFlags(claims.UserID, claims.Username, claims.MustChangePassword)
 		SetTokenCookie(c, newToken)
 
 		c.Next()

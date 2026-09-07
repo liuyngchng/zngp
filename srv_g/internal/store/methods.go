@@ -26,7 +26,12 @@ func (s *Store) CreateUser(user *model.User) error {
 }
 
 func (s *Store) UpdateUserPassword(userID int64, hash string) error {
-	return s.DB.Model(&model.User{}).Where("id = ?", userID).Update("password_hash", hash).Error
+	return s.DB.Model(&model.User{}).Where("id = ?", userID).
+		Updates(map[string]interface{}{
+			"password_hash":        hash,
+			"must_change_password": false,
+			"password_expires_at":  nil,
+		}).Error
 }
 
 // ── Record ────────────────────────────────────────────────────────────

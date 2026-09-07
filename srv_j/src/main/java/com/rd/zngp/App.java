@@ -10,6 +10,7 @@ import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,22 +57,43 @@ public class App {
 
     /**
      * Create default admin user if no users exist.
+     * Uses a randomly generated password (valid for 2 hours).
      */
     private static void ensureDefaultAdmin(Store store) {
         try {
             long count = store.countUsers();
             if (count > 0) return;
 
-            String hash = BCrypt.hashpw(Config.appConfig.auth.password, BCrypt.gensalt());
+            String password = generateRandomPassword(12);
+            String hash = BCrypt.hashpw(password, BCrypt.gensalt());
             User user = new User();
             user.username = Config.appConfig.auth.username;
             user.passwordHash = hash;
             user.role = "admin";
+            user.mustChangePassword = true;
+            user.passwordExpiresAt = LocalDateTime.now().plusHours(2);
             user.createdAt = LocalDateTime.now();
             store.createUser(user);
+
+            log.info("============================================");
+            log.info("  初始管理员密码: {}", password);
+            log.info("  有效期: 2小时 (至 {})", user.passwordExpiresAt);
+            log.info("  首次登录后必须修改密码");
+            log.info("============================================");
         } catch (Exception e) {
             log.error("创建默认管理员失败", e);
         }
+    }
+
+    private static final String PASSWORD_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+    private static final SecureRandom RANDOM = new SecureRandom();
+
+    private static String generateRandomPassword(int length) {
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            sb.append(PASSWORD_CHARS.charAt(RANDOM.nextInt(PASSWORD_CHARS.length())));
+        }
+        return sb.toString();
     }
 
     /**

@@ -26,12 +26,17 @@ public class JwtUtil {
     }
 
     public static String generateToken(long userId, String username) {
+        return generateTokenWithFlags(userId, username, false);
+    }
+
+    public static String generateTokenWithFlags(long userId, String username, boolean mustChangePassword) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + 72L * 3600 * 1000); // 72 hours
 
         return Jwts.builder()
             .claim("user_id", userId)
             .claim("username", username)
+            .claim("must_change_password", mustChangePassword)
             .setIssuedAt(now)
             .setExpiration(expiry)
             .signWith(getKey(), SignatureAlgorithm.HS256)
