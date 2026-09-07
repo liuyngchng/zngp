@@ -98,7 +98,7 @@ public class LLMService {
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setDoOutput(true);
 
-        log.info("[LLM] 请求开始: url={}, model={}, system_prompt_len={}, user_prompt_len={}", apiURL, cfg.llm.model, systemPrompt.length(), userPrompt.length());
+        log.info("[LLM] request_start: url={}, model={}, system_prompt_len={}, user_prompt_len={}", apiURL, cfg.llm.model, systemPrompt.length(), userPrompt.length());
         long startMs = System.currentTimeMillis();
 
         try (OutputStream os = conn.getOutputStream()) {
@@ -110,19 +110,19 @@ public class LLMService {
         byte[] bodyBytes = ASRService.readAll(conn, status);
 
         if (status != 200) {
-            log.error("[LLM] 返回错误: url={}, status={}, body={}, elapsed_ms={}", apiURL, status, new String(bodyBytes, StandardCharsets.UTF_8), elapsedMs);
+            log.error("[LLM] http_error: url={}, status={}, body={}, elapsed_ms={}", apiURL, status, new String(bodyBytes, StandardCharsets.UTF_8), elapsedMs);
             throw new Exception("LLM API 返回错误 (" + status + "): " + new String(bodyBytes, StandardCharsets.UTF_8));
         }
 
         LLMResponse llmResp = mapper.readValue(bodyBytes, LLMResponse.class);
 
         if (llmResp.error != null) {
-            log.error("[LLM] API 业务错误: err={}, elapsed_ms={}", llmResp.error.message, elapsedMs);
+            log.error("[LLM] api_biz_error: err={}, elapsed_ms={}", llmResp.error.message, elapsedMs);
             throw new Exception("LLM 错误: " + llmResp.error.message);
         }
 
         if (llmResp.choices == null || llmResp.choices.isEmpty()) {
-            log.error("[LLM] 返回空结果: elapsed_ms={}", elapsedMs);
+            log.error("[LLM] empty_result: elapsed_ms={}", elapsedMs);
             throw new Exception("LLM 返回空结果");
         }
 
@@ -132,7 +132,7 @@ public class LLMService {
         }
 
         String content = llmResp.choices.get(0).message.content;
-        log.info("[LLM] 请求成功: response_len={}, tokens={}, elapsed_ms={}", content != null ? content.length() : 0, tokens, elapsedMs);
+        log.info("[LLM] request_success: response_len={}, tokens={}, elapsed_ms={}", content != null ? content.length() : 0, tokens, elapsedMs);
         return new ChatResult(content, tokens);
     }
 

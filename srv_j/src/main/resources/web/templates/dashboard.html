@@ -1,69 +1,72 @@
-{{define "content_dashboard"}}
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+<th:block th:fragment="content">
 <div class="page-header">
-    <h1><i class="fas fa-tachometer-alt"></i> 仪表盘</h1>
+    <h1><i class="fas fa-tachometer-alt"></i> dashboard</h1>
 </div>
 
 <div class="stats-grid">
     <div class="stat-card">
-        <div class="stat-number">{{.total_records}}</div>
-        <div class="stat-label"><i class="fas fa-file-audio"></i> 总记录数</div>
+        <div class="stat-number" th:text="${total_records}">0</div>
+        <div class="stat-label"><i class="fas fa-file-audio"></i> total records</div>
     </div>
     <div class="stat-card stat-card-green">
-        <div class="stat-number">{{.compliant_count}}</div>
-        <div class="stat-label"><i class="fas fa-check-circle"></i> 合规</div>
+        <div class="stat-number" th:text="${compliant_count}">0</div>
+        <div class="stat-label"><i class="fas fa-check-circle"></i> compliant</div>
     </div>
     <div class="stat-card stat-card-red">
-        <div class="stat-number">{{.non_compliant}}</div>
-        <div class="stat-label"><i class="fas fa-times-circle"></i> 不合规</div>
+        <div class="stat-number" th:text="${non_compliant}">0</div>
+        <div class="stat-label"><i class="fas fa-times-circle"></i> non-compliant</div>
     </div>
     <div class="stat-card stat-card-yellow">
-        <div class="stat-number">{{.review_count}}</div>
-        <div class="stat-label"><i class="fas fa-exclamation-triangle"></i> 需复核</div>
+        <div class="stat-number" th:text="${review_count}">0</div>
+        <div class="stat-label"><i class="fas fa-exclamation-triangle"></i> review</div>
     </div>
 </div>
 
 <div class="section">
-    <h2><i class="fas fa-clock"></i> 最近记录</h2>
+    <h2><i class="fas fa-clock"></i> recent records</h2>
     <table class="table">
         <thead>
             <tr>
-                <th>客户</th>
-                <th>安检员</th>
-                <th>日期</th>
-                <th>转写状态</th>
-                <th>质检结果</th>
-                <th>操作</th>
+                <th>customer</th><th>inspector</th><th>date</th>
+                <th>transcript</th><th>inspection</th><th>action</th>
             </tr>
         </thead>
         <tbody>
-            {{range .recent_records}}
-            <tr>
-                <td>{{.CustomerName}}</td>
-                <td>{{.InspectorName}}</td>
-                <td>{{.InspectionDate.Format "2006-01-02"}}</td>
+            <tr th:each="r : ${recent_records}">
+                <td th:text="${r.customerName}">customer</td>
+                <td th:text="${r.inspectorName}">inspector</td>
+                <td th:text="${#temporals.format(r.inspectionDate, 'yyyy-MM-dd')}">date</td>
+                <td><span class="badge" th:classappend="'badge-' + ${r.transcriptStatus}" th:text="${r.transcriptStatus}">status</span></td>
                 <td>
-                    <span class="badge badge-{{transcriptStatusClass .TranscriptStatus}}">{{.TranscriptStatus}}</span>
+                    <th:block th:if="${r.inspectionStatus == 'COMPLETED'}">
+                        <a th:href="@{/records/{id}(id=${r.id})}"><i class="fas fa-eye"></i> view</a>
+                    </th:block>
+                    <th:block th:if="${r.inspectionStatus != 'COMPLETED' and r.inspectionStatus != 'NONE'}">
+                        <span class="badge badge-blue" th:text="${r.inspectionStatus}">status</span>
+                    </th:block>
+                    <th:block th:if="${r.inspectionStatus == 'NONE'}">
+                        <span class="badge badge-gray">not inspected</span>
+                    </th:block>
                 </td>
                 <td>
-                    {{if eq .InspectionStatus "COMPLETED"}}
-                        <a href="/records/{{.ID}}"><i class="fas fa-eye"></i> 查看</a>
-                    {{else if eq .InspectionStatus "NONE"}}
-                        <span class="badge badge-gray">未质检</span>
-                    {{else}}
-                        <span class="badge badge-blue">{{.InspectionStatus}}</span>
-                    {{end}}
-                </td>
-                <td>
-                    <a href="/records/{{.ID}}" class="btn btn-sm btn-outline"><i class="fas fa-arrow-right"></i> 详情</a>
+                    <a th:href="@{/records/{id}(id=${r.id})}" class="btn btn-sm btn-outline"><i class="fas fa-arrow-right"></i> detail</a>
                 </td>
             </tr>
-            {{else}}
-            <tr><td colspan="6" class="text-center" style="padding:32px;">
-                <i class="fas fa-inbox" style="font-size:2rem;color:#d0d5dd;display:block;margin-bottom:8px;"></i>
-                暂无记录
-            </td></tr>
-            {{end}}
+            <tr th:if="${#lists.isEmpty(recent_records)}">
+                <td colspan="6" class="text-center" style="padding:32px;">
+                    <i class="fas fa-inbox" style="font-size:2rem;color:#d0d5dd;display:block;margin-bottom:8px;"></i>
+                    no records
+                </td>
+            </tr>
         </tbody>
     </table>
 </div>
-{{end}}{{template "layout" .}}
+</th:block>
+</body>
+</html>

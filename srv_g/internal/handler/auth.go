@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/zngp/server/config"
 	"github.com/zngp/server/internal/logx"
 	"github.com/zngp/server/internal/middleware"
 	"github.com/zngp/server/internal/model"
@@ -165,8 +166,13 @@ func EnsureDefaultAdmin(s *store.Store) error {
 
 	expiresAt := time.Now().Add(2 * time.Hour)
 
+	username := config.AppConfig.Auth.Username
+	if username == "" {
+		username = "admin"
+	}
+
 	user := &model.User{
-		Username:           "admin",
+		Username:           username,
 		PasswordHash:       string(hash),
 		Role:               "admin",
 		MustChangePassword: true,

@@ -1,19 +1,19 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/static/lib/font-awesome.all.min.css">
     <link rel="stylesheet" href="/static/css/style.css?v=2">
-    <title>登录 - {{sysName}}</title>
+    <title th:text="'login - ' + ${sysName}">login</title>
 </head>
 <body>
     <div class="login-wrapper">
         <div class="login-card">
             <div class="login-header">
                 <i class="fas fa-microphone-alt"></i>
-                <h1>{{sysName}}</h1>
-                <p>燃气入户安检 · 客户拜访合规质检</p>
+                <h1 th:text="${sysName}">system</h1>
+                <p>gas inspection &amp; customer visit quality audit</p>
             </div>
 
             <div class="login-error" id="loginError" style="display:none;">
@@ -22,41 +22,41 @@
 
             <form id="loginForm" class="login-form">
                 <div class="login-field">
-                    <label><i class="fas fa-user"></i> 用户名</label>
-                    <input type="text" id="username" name="username" required placeholder="请输入用户名" autocomplete="username">
+                    <label><i class="fas fa-user"></i> username</label>
+                    <input type="text" id="username" name="username" required placeholder="username" autocomplete="username">
                 </div>
                 <div class="login-field">
-                    <label><i class="fas fa-lock"></i> 密码</label>
-                    <input type="password" id="password" name="password" required placeholder="请输入密码" autocomplete="current-password">
+                    <label><i class="fas fa-lock"></i> password</label>
+                    <input type="password" id="password" name="password" required placeholder="password" autocomplete="current-password">
                 </div>
                 <button type="submit" class="login-btn">
-                    <i class="fas fa-sign-in-alt"></i> 登 录
+                    <i class="fas fa-sign-in-alt"></i> login
                 </button>
             </form>
 
             <form id="changePwdForm" class="login-form" style="display:none;">
                 <div class="login-header" style="margin-bottom:12px;">
-                    <h2 style="font-size:1.2rem;color:#fff;">首次登录，请修改密码</h2>
+                    <h2 style="font-size:1.2rem;color:#fff;">first login, change password</h2>
                 </div>
                 <div class="login-error" id="changePwdError" style="display:none;">
                     <i class="fas fa-exclamation-circle"></i> <span id="changePwdErrorMsg"></span>
                 </div>
                 <input type="hidden" id="old_password" name="old_password">
                 <div class="login-field">
-                    <label><i class="fas fa-key"></i> 新密码</label>
-                    <input type="password" id="new_password" name="new_password" required placeholder="请输入新密码（至少6位）" autocomplete="new-password">
+                    <label><i class="fas fa-key"></i> new password</label>
+                    <input type="password" id="new_password" name="new_password" required placeholder="new password (min 6 chars)" autocomplete="new-password">
                 </div>
                 <div class="login-field">
-                    <label><i class="fas fa-check-circle"></i> 确认新密码</label>
-                    <input type="password" id="confirm_password" name="confirm_password" required placeholder="请再次输入新密码" autocomplete="new-password">
+                    <label><i class="fas fa-check-circle"></i> confirm password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" required placeholder="re-enter new password" autocomplete="new-password">
                 </div>
                 <button type="submit" class="login-btn">
-                    <i class="fas fa-save"></i> 修改密码
+                    <i class="fas fa-save"></i> change password
                 </button>
             </form>
 
             <div class="login-footer">
-                <p>{{sysName}} · 语音质检管理系统</p>
+                <p th:text="${sysName} + ' · voice quality audit system'">system</p>
             </div>
         </div>
     </div>
@@ -77,20 +77,18 @@
                 const data = await resp.json();
                 if (resp.ok) {
                     if (data.must_change_password) {
-                        // 首次登录：显示修改密码表单
                         document.getElementById('loginForm').style.display = 'none';
                         document.getElementById('changePwdForm').style.display = 'block';
                         document.getElementById('old_password').value = password;
                     } else {
-                        // 服务端已通过 Set-Cookie 写入 token，直接跳转
                         window.location.href = '/';
                     }
                 } else {
-                    errMsg.textContent = data.error || '登录失败';
+                    errMsg.textContent = data.error || 'login failed';
                     errEl.style.display = 'flex';
                 }
             } catch (err) {
-                errMsg.textContent = '网络错误，请检查服务器连接';
+                errMsg.textContent = 'network error, check server connection';
                 errEl.style.display = 'flex';
             }
         }
@@ -104,12 +102,12 @@
             const errMsg = document.getElementById('changePwdErrorMsg');
 
             if (newPassword.length < 6) {
-                errMsg.textContent = '新密码至少需要6位';
+                errMsg.textContent = 'new password must be at least 6 characters';
                 errEl.style.display = 'flex';
                 return;
             }
             if (newPassword !== confirmPassword) {
-                errMsg.textContent = '两次输入的新密码不一致';
+                errMsg.textContent = 'passwords do not match';
                 errEl.style.display = 'flex';
                 return;
             }
@@ -122,14 +120,13 @@
                 });
                 const data = await resp.json();
                 if (resp.ok) {
-                    // 修改成功，服务端已写入新 token，跳转首页
                     window.location.href = '/';
                 } else {
-                    errMsg.textContent = data.error || '修改密码失败';
+                    errMsg.textContent = data.error || 'password change failed';
                     errEl.style.display = 'flex';
                 }
             } catch (err) {
-                errMsg.textContent = '网络错误，请检查服务器连接';
+                errMsg.textContent = 'network error, check server connection';
                 errEl.style.display = 'flex';
             }
         }

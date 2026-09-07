@@ -194,14 +194,14 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
 	logx.Info("server_starting_http", "addr", addr)
-	printAccessURLs(cfg.Server.Host, cfg.Server.Port)
+	printAccessURLs(cfg.Server.Port)
 	if err := r.Run(addr); err != nil {
 		logx.Fatal("server_run_failed", "err", err)
 	}
 }
 
 // printAccessURLs lists all local IP addresses with clickable access URLs.
-func printAccessURLs(host, port string) {
+func printAccessURLs(port string) {
 	ips := collectLocalIPs()
 	if len(ips) == 0 {
 		logx.Info("server_access_url", "url", fmt.Sprintf("http://127.0.0.1:%s", port))

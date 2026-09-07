@@ -2,6 +2,8 @@ package com.rd.zngp.store;
 
 import com.rd.zngp.model.*;
 import com.rd.zngp.model.Record;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +16,7 @@ import java.util.List;
 
 /**
  * SQLite-backed data store, mirroring server/internal/store/store.go and methods.go.
- * Uses raw JDBC for simplicity and JDK 1.8 compatibility.
+ * Uses HikariCP connection pool for thread safety with Netty's concurrent worker threads.
  */
 public class Store {
 
@@ -22,14 +24,14 @@ public class Store {
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
     private final String dbPath;
-    private Connection conn;
+    private HikariDataSource dataSource;
 
     public Store(String dbPath) {
         this.dbPath = dbPath;
     }
 
     /**
-     * Initialize the database: create directories, open connection, migrate tables.
+     * Initialize the database: create directories, setup connection pool, migrate tables.
      */
     public void init() throws SQLException {
         File dbFile = new File(dbPath);
@@ -44,20 +46,32 @@ public class Store {
             throw new SQLException("SQLite JDBC driver not found", e);
         }
 
-        conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl("jdbc:sqlite:" + dbPath);
+        // SQLite serializes writes; a small pool of 3 connections is sufficient
+        config.setMaximumPoolSize(3);
+        config.setMinimumIdle(1);
+        config.setConnectionTimeout(10000);
+        config.setIdleTimeout(600000);
+        config.setPoolName("zngp-sqlite-pool");
 
-        try (Statement stmt = conn.createStatement()) {
+        dataSource = new HikariDataSource(config);
+
+        // Run pragmas on the first connection to configure WAL mode
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
             stmt.execute("PRAGMA foreign_keys = ON");
             stmt.execute("PRAGMA journal_mode = WAL");
             stmt.execute("PRAGMA synchronous = NORMAL");
         }
 
         migrate();
-        log.info("数据库初始化完成: {}", dbPath);
+        log.info("db_init_done: {}", dbPath);
     }
 
     private void migrate() throws SQLException {
-        try (Statement stmt = conn.createStatement()) {
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
             stmt.execute("CREATE TABLE IF NOT EXISTS users (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "username TEXT UNIQUE NOT NULL," +
@@ -140,7 +154,7 @@ public class Store {
                 stmt.execute("ALTER TABLE users ADD COLUMN password_expires_at TEXT");
             } catch (SQLException ignored) {}
         }
-        log.info("数据库迁移完成");
+        log.info("db_migration_done");
     }
 
     // ---- Helpers ----
@@ -158,11 +172,17 @@ public class Store {
         }
     }
 
+    /** Get a connection from the pool (must be closed by caller). */
+    private Connection getConnection() throws SQLException {
+        return dataSource.getConnection();
+    }
+
     // ---- User methods ----
 
     public User findUserByUsername(String username) throws SQLException {
         String sql = "SELECT id, username, password_hash, role, must_change_password, password_expires_at, created_at FROM users WHERE username = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, username);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -174,15 +194,20 @@ public class Store {
     }
 
     public long countUsers() throws SQLException {
-        try (Statement stmt = conn.createStatement();
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM users")) {
-            return rs.getLong(1);
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+            return 0;
         }
     }
 
     public void createUser(User user) throws SQLException {
         String sql = "INSERT INTO users (username, password_hash, role, must_change_password, password_expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, user.username);
             ps.setString(2, user.passwordHash);
             ps.setString(3, user.role);
@@ -195,7 +220,8 @@ public class Store {
 
     public void updateUserPassword(long userId, String hash) throws SQLException {
         String sql = "UPDATE users SET password_hash = ?, must_change_password = 0, password_expires_at = NULL WHERE id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, hash);
             ps.setLong(2, userId);
             ps.executeUpdate();
@@ -221,7 +247,8 @@ public class Store {
             "customer_address, inspection_date, source_type, audio_file_path, audio_duration, " +
             "transcript_text, transcript_status, inspection_status, created_at, updated_at) " +
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, record.id);
             ps.setString(2, record.title);
             ps.setString(3, record.description);
@@ -243,7 +270,8 @@ public class Store {
 
     public Record getRecord(String id) throws SQLException {
         String sql = "SELECT * FROM records WHERE id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -267,14 +295,15 @@ public class Store {
             params.add(like);
         }
 
-        String countSql = "SELECT COUNT(*) FROM records" + where;
         long total = 0;
-        try (PreparedStatement ps = conn.prepareStatement(countSql)) {
+        String countSql = "SELECT COUNT(*) FROM records" + where;
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(countSql)) {
             for (int i = 0; i < params.size(); i++) {
                 ps.setObject(i + 1, params.get(i));
             }
             try (ResultSet rs = ps.executeQuery()) {
-                total = rs.getLong(1);
+                if (rs.next()) total = rs.getLong(1);
             }
         }
 
@@ -284,7 +313,8 @@ public class Store {
         params.add(offset);
 
         List<Record> records = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(dataSql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(dataSql)) {
             for (int i = 0; i < params.size(); i++) {
                 ps.setObject(i + 1, params.get(i));
             }
@@ -300,7 +330,8 @@ public class Store {
 
     public void updateRecordTranscript(String recordId, String transcript, String status) throws SQLException {
         String sql = "UPDATE records SET transcript_text = ?, transcript_status = ?, updated_at = ? WHERE id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, transcript);
             ps.setString(2, status);
             ps.setString(3, now());
@@ -311,7 +342,8 @@ public class Store {
 
     public void updateRecordInspectionStatus(String recordId, String status) throws SQLException {
         String sql = "UPDATE records SET inspection_status = ?, updated_at = ? WHERE id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, status);
             ps.setString(2, now());
             ps.setString(3, recordId);
@@ -321,7 +353,8 @@ public class Store {
 
     public void deleteRecord(String id) throws SQLException {
         String sql = "DELETE FROM records WHERE id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, id);
             ps.executeUpdate();
         }
@@ -350,57 +383,57 @@ public class Store {
     // ---- Template methods ----
 
     public void createTemplate(InspectionTemplate t) throws SQLException {
-        conn.setAutoCommit(false);
-        try {
-            String sql = "INSERT INTO inspection_templates (name, description, category, is_active, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?)";
-            try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-                ps.setString(1, t.name);
-                ps.setString(2, t.description);
-                ps.setString(3, t.category);
-                ps.setInt(4, t.isActive ? 1 : 0);
-                ps.setString(5, now());
-                ps.setString(6, now());
-                ps.executeUpdate();
-                try (ResultSet keys = ps.getGeneratedKeys()) {
-                    if (keys.next()) {
-                        t.id = keys.getLong(1);
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                String sql = "INSERT INTO inspection_templates (name, description, category, is_active, created_at, updated_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?)";
+                try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                    ps.setString(1, t.name);
+                    ps.setString(2, t.description);
+                    ps.setString(3, t.category);
+                    ps.setInt(4, t.isActive ? 1 : 0);
+                    ps.setString(5, now());
+                    ps.setString(6, now());
+                    ps.executeUpdate();
+                    try (ResultSet keys = ps.getGeneratedKeys()) {
+                        if (keys.next()) {
+                            t.id = keys.getLong(1);
+                        }
                     }
                 }
-            }
 
-            // Insert items
-            if (t.items != null && !t.items.isEmpty()) {
-                String itemSql = "INSERT INTO inspection_items (template_id, item_number, name, description, category, is_required, weight, created_at) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-                for (InspectionItem item : t.items) {
-                    try (PreparedStatement ps = conn.prepareStatement(itemSql)) {
-                        ps.setLong(1, t.id);
-                        ps.setInt(2, item.itemNumber);
-                        ps.setString(3, item.name);
-                        ps.setString(4, item.description);
-                        ps.setString(5, item.category);
-                        ps.setInt(6, item.isRequired ? 1 : 0);
-                        ps.setInt(7, item.weight);
-                        ps.setString(8, now());
-                        ps.executeUpdate();
+                if (t.items != null && !t.items.isEmpty()) {
+                    String itemSql = "INSERT INTO inspection_items (template_id, item_number, name, description, category, is_required, weight, created_at) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                    for (InspectionItem item : t.items) {
+                        try (PreparedStatement ps = conn.prepareStatement(itemSql)) {
+                            ps.setLong(1, t.id);
+                            ps.setInt(2, item.itemNumber);
+                            ps.setString(3, item.name);
+                            ps.setString(4, item.description);
+                            ps.setString(5, item.category);
+                            ps.setInt(6, item.isRequired ? 1 : 0);
+                            ps.setInt(7, item.weight);
+                            ps.setString(8, now());
+                            ps.executeUpdate();
+                        }
                     }
                 }
-            }
 
-            conn.commit();
-        } catch (SQLException e) {
-            conn.rollback();
-            throw e;
-        } finally {
-            conn.setAutoCommit(true);
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            }
         }
     }
 
     public InspectionTemplate getTemplate(long id) throws SQLException {
-        String sql = "SELECT * FROM inspection_templates WHERE id = ?";
         InspectionTemplate t = null;
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        String sql = "SELECT * FROM inspection_templates WHERE id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -416,7 +449,8 @@ public class Store {
 
     public List<InspectionTemplate> listTemplates() throws SQLException {
         List<InspectionTemplate> templates = new ArrayList<>();
-        try (Statement stmt = conn.createStatement();
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT * FROM inspection_templates ORDER BY id ASC")) {
             while (rs.next()) {
                 InspectionTemplate t = mapTemplate(rs);
@@ -429,7 +463,8 @@ public class Store {
 
     public void updateTemplate(InspectionTemplate t) throws SQLException {
         String sql = "UPDATE inspection_templates SET name = ?, description = ?, is_active = ?, updated_at = ? WHERE id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, t.name);
             ps.setString(2, t.description);
             ps.setInt(3, t.isActive ? 1 : 0);
@@ -440,29 +475,30 @@ public class Store {
     }
 
     public void deleteTemplate(long id) throws SQLException {
-        conn.setAutoCommit(false);
-        try {
-            try (PreparedStatement ps = conn.prepareStatement("DELETE FROM inspection_items WHERE template_id = ?")) {
-                ps.setLong(1, id);
-                ps.executeUpdate();
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM inspection_items WHERE template_id = ?")) {
+                    ps.setLong(1, id);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM inspection_templates WHERE id = ?")) {
+                    ps.setLong(1, id);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
             }
-            try (PreparedStatement ps = conn.prepareStatement("DELETE FROM inspection_templates WHERE id = ?")) {
-                ps.setLong(1, id);
-                ps.executeUpdate();
-            }
-            conn.commit();
-        } catch (SQLException e) {
-            conn.rollback();
-            throw e;
-        } finally {
-            conn.setAutoCommit(true);
         }
     }
 
     private List<InspectionItem> listItemsByTemplate(long templateId) throws SQLException {
         List<InspectionItem> items = new ArrayList<>();
         String sql = "SELECT * FROM inspection_items WHERE template_id = ? ORDER BY item_number ASC";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, templateId);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -476,7 +512,8 @@ public class Store {
     public void createItem(InspectionItem item) throws SQLException {
         String sql = "INSERT INTO inspection_items (template_id, item_number, name, description, category, is_required, weight, created_at) " +
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setLong(1, item.templateId);
             ps.setInt(2, item.itemNumber);
             ps.setString(3, item.name);
@@ -496,7 +533,8 @@ public class Store {
 
     public void updateItem(InspectionItem item) throws SQLException {
         String sql = "UPDATE inspection_items SET name = ?, description = ?, category = ?, is_required = ?, weight = ?, item_number = ? WHERE id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, item.name);
             ps.setString(2, item.description);
             ps.setString(3, item.category);
@@ -509,7 +547,8 @@ public class Store {
     }
 
     public void deleteItem(long id) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("DELETE FROM inspection_items WHERE id = ?")) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement("DELETE FROM inspection_items WHERE id = ?")) {
             ps.setLong(1, id);
             ps.executeUpdate();
         }
@@ -517,7 +556,8 @@ public class Store {
 
     public InspectionItem getItem(long id) throws SQLException {
         String sql = "SELECT * FROM inspection_items WHERE id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -557,59 +597,59 @@ public class Store {
     // ---- Inspection methods ----
 
     public void createInspectionResult(InspectionResult r) throws SQLException {
-        conn.setAutoCommit(false);
-        try {
-            String sql = "INSERT INTO inspection_results (record_id, template_id, overall_conclusion, overall_score, summary, raw_llm_response, model_used, tokens_used, created_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-                ps.setString(1, r.recordId);
-                ps.setLong(2, r.templateId);
-                ps.setString(3, r.overallConclusion);
-                ps.setInt(4, r.overallScore);
-                ps.setString(5, r.summary);
-                ps.setString(6, r.rawLlmResponse);
-                ps.setString(7, r.modelUsed);
-                ps.setInt(8, r.tokensUsed);
-                ps.setString(9, now());
-                ps.executeUpdate();
-                try (ResultSet keys = ps.getGeneratedKeys()) {
-                    if (keys.next()) {
-                        r.id = keys.getLong(1);
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                String sql = "INSERT INTO inspection_results (record_id, template_id, overall_conclusion, overall_score, summary, raw_llm_response, model_used, tokens_used, created_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                    ps.setString(1, r.recordId);
+                    ps.setLong(2, r.templateId);
+                    ps.setString(3, r.overallConclusion);
+                    ps.setInt(4, r.overallScore);
+                    ps.setString(5, r.summary);
+                    ps.setString(6, r.rawLlmResponse);
+                    ps.setString(7, r.modelUsed);
+                    ps.setInt(8, r.tokensUsed);
+                    ps.setString(9, now());
+                    ps.executeUpdate();
+                    try (ResultSet keys = ps.getGeneratedKeys()) {
+                        if (keys.next()) {
+                            r.id = keys.getLong(1);
+                        }
                     }
                 }
-            }
 
-            // Insert item results
-            if (r.items != null && !r.items.isEmpty()) {
-                String itemSql = "INSERT INTO item_results (inspection_result_id, item_id, item_name, verdict, evidence, confidence, ai_reasoning) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)";
-                for (ItemResult ir : r.items) {
-                    try (PreparedStatement ps = conn.prepareStatement(itemSql)) {
-                        ps.setLong(1, r.id);
-                        ps.setLong(2, ir.itemId);
-                        ps.setString(3, ir.itemName);
-                        ps.setString(4, ir.verdict);
-                        ps.setString(5, ir.evidence);
-                        ps.setDouble(6, ir.confidence);
-                        ps.setString(7, ir.aiReasoning);
-                        ps.executeUpdate();
+                if (r.items != null && !r.items.isEmpty()) {
+                    String itemSql = "INSERT INTO item_results (inspection_result_id, item_id, item_name, verdict, evidence, confidence, ai_reasoning) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)";
+                    for (ItemResult ir : r.items) {
+                        try (PreparedStatement ps = conn.prepareStatement(itemSql)) {
+                            ps.setLong(1, r.id);
+                            ps.setLong(2, ir.itemId);
+                            ps.setString(3, ir.itemName);
+                            ps.setString(4, ir.verdict);
+                            ps.setString(5, ir.evidence);
+                            ps.setDouble(6, ir.confidence);
+                            ps.setString(7, ir.aiReasoning);
+                            ps.executeUpdate();
+                        }
                     }
                 }
-            }
 
-            conn.commit();
-        } catch (SQLException e) {
-            conn.rollback();
-            throw e;
-        } finally {
-            conn.setAutoCommit(true);
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            }
         }
     }
 
     public InspectionResult getInspectionResult(long id) throws SQLException {
-        String sql = "SELECT * FROM inspection_results WHERE id = ?";
         InspectionResult r = null;
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        String sql = "SELECT * FROM inspection_results WHERE id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -624,9 +664,10 @@ public class Store {
     }
 
     public InspectionResult getInspectionByRecordId(String recordId) throws SQLException {
-        String sql = "SELECT * FROM inspection_results WHERE record_id = ? ORDER BY created_at DESC LIMIT 1";
         InspectionResult r = null;
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        String sql = "SELECT * FROM inspection_results WHERE record_id = ? ORDER BY created_at DESC LIMIT 1";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, recordId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -643,7 +684,8 @@ public class Store {
     private List<ItemResult> listItemResultsByInspection(long inspectionResultId) throws SQLException {
         List<ItemResult> items = new ArrayList<>();
         String sql = "SELECT * FROM item_results WHERE inspection_result_id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, inspectionResultId);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -686,31 +728,29 @@ public class Store {
 
     public OverviewResult getOverview() throws SQLException {
         OverviewResult result = new OverviewResult();
-        try (Statement stmt = conn.createStatement()) {
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement()) {
             try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM records")) {
-                result.totalRecords = rs.getLong(1);
+                if (rs.next()) result.totalRecords = rs.getLong(1);
             }
             try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM inspection_results WHERE overall_conclusion = '规范'")) {
-                result.compliantCount = rs.getLong(1);
+                if (rs.next()) result.compliantCount = rs.getLong(1);
             }
             try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM inspection_results WHERE overall_conclusion = '不规范'")) {
-                result.nonCompliantCount = rs.getLong(1);
+                if (rs.next()) result.nonCompliantCount = rs.getLong(1);
             }
             try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM inspection_results WHERE overall_conclusion = '需复核'")) {
-                result.reviewCount = rs.getLong(1);
+                if (rs.next()) result.reviewCount = rs.getLong(1);
             }
         }
         return result;
     }
 
     public void close() {
-        try {
-            if (conn != null && !conn.isClosed()) {
-                conn.close();
-            }
-        } catch (SQLException e) {
-            log.error("关闭数据库连接失败", e);
+        if (dataSource != null && !dataSource.isClosed()) {
+            dataSource.close();
         }
+        log.info("数据库连接池已关闭");
     }
 
     // ---- Helper classes ----

@@ -1,88 +1,55 @@
-{{define "content_records"}}
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"></head>
+<body><th:block th:fragment="content">
 <div class="page-header">
-    <h1><i class="fas fa-list-alt"></i> 记录列表</h1>
+    <h1><i class="fas fa-list-alt"></i> records</h1>
     <form method="GET" action="/records" class="search-form">
-        <input type="text" name="keyword" value="{{.keyword}}" placeholder="搜索客户、安检员、标题..." class="search-input">
-        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> 搜索</button>
+        <input type="text" name="keyword" th:value="${keyword}" placeholder="search customer, inspector, title..." class="search-input">
+        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> search</button>
     </form>
 </div>
-
 <div class="section">
     <table class="table">
-        <thead>
-            <tr>
-                <th>客户</th>
-                <th>安检员</th>
-                <th>地址</th>
-                <th>日期</th>
-                <th>时长</th>
-                <th>转写</th>
-                <th>质检</th>
-                <th>操作</th>
-            </tr>
-        </thead>
+        <thead><tr>
+            <th>customer</th><th>inspector</th><th>address</th><th>date</th>
+            <th>duration</th><th>transcript</th><th>inspection</th><th>action</th>
+        </tr></thead>
         <tbody>
-            {{range .records}}
-            <tr>
-                <td>{{.CustomerName}}</td>
-                <td>{{.InspectorName}}</td>
-                <td>{{.CustomerAddress}}</td>
-                <td>{{.InspectionDate.Format "2006-01-02"}}</td>
-                <td>{{printf "%.0f" .AudioDuration}}s</td>
-                <td><span class="badge badge-{{transcriptStatusClass .TranscriptStatus}}">{{.TranscriptStatus}}</span></td>
-                <td><span class="badge badge-{{inspectionStatusClass .InspectionStatus}}">{{.InspectionStatus}}</span></td>
+            <tr th:each="r : ${records}">
+                <td th:text="${r.customerName}">-</td>
+                <td th:text="${r.inspectorName}">-</td>
+                <td th:text="${r.customerAddress}">-</td>
+                <td th:text="${#temporals.format(r.inspectionDate, 'yyyy-MM-dd')}">-</td>
+                <td th:text="${#numbers.formatInteger(r.audioDuration)} + 's'">0s</td>
+                <td><span class="badge" th:classappend="'badge-' + ${r.transcriptStatus}" th:text="${r.transcriptStatus}">PENDING</span></td>
+                <td><span class="badge" th:classappend="'badge-' + ${r.inspectionStatus}" th:text="${r.inspectionStatus}">NONE</span></td>
                 <td>
-                    <a href="/records/{{.ID}}" class="btn btn-sm btn-outline"><i class="fas fa-arrow-right"></i> 详情</a>
-                    {{if eq .TranscriptStatus "FAILED"}}
-                    <button class="btn btn-sm btn-warning" onclick="retryTranscribe('{{.ID}}')" title="重试转写"><i class="fas fa-redo"></i></button>
-                    {{end}}
-                    {{if eq .InspectionStatus "FAILED"}}
-                    <button class="btn btn-sm btn-warning" onclick="retryInspect('{{.ID}}')" title="重试质检"><i class="fas fa-redo"></i></button>
-                    {{end}}
+                    <a th:href="@{/records/{id}(id=${r.id})}" class="btn btn-sm btn-outline"><i class="fas fa-arrow-right"></i> detail</a>
+                    <button th:if="${r.transcriptStatus == 'FAILED'}" class="btn btn-sm btn-warning" th:attr="onclick='retryTranscribe(\'' + ${r.id} + '\')'" title="retry transcribe"><i class="fas fa-redo"></i></button>
+                    <button th:if="${r.inspectionStatus == 'FAILED'}" class="btn btn-sm btn-warning" th:attr="onclick='retryInspect(\'' + ${r.id} + '\')'" title="retry inspect"><i class="fas fa-redo"></i></button>
                 </td>
             </tr>
-            {{else}}
-            <tr><td colspan="8" class="text-center" style="padding:32px;">
-                <i class="fas fa-inbox" style="font-size:2rem;color:#d0d5dd;display:block;margin-bottom:8px;"></i>
-                暂无记录
-            </td></tr>
-            {{end}}
+            <tr th:if="${#lists.isEmpty(records)}">
+                <td colspan="8" class="text-center" style="padding:32px;"><i class="fas fa-inbox" style="font-size:2rem;color:#d0d5dd;display:block;margin-bottom:8px;"></i>no records</td>
+            </tr>
         </tbody>
     </table>
-
-    {{if gt .total_pages 1}}
-    <div class="pagination">
-        {{if gt .page 1}}
-        <a href="/records?page={{sub .page 1}}&keyword={{.keyword}}" class="btn btn-outline"><i class="fas fa-chevron-left"></i> 上一页</a>
-        {{end}}
-        <span>第 {{.page}} / {{.total_pages}} 页（共 {{.total}} 条）</span>
-        {{if lt .page .total_pages}}
-        <a href="/records?page={{add .page 1}}&keyword={{.keyword}}" class="btn btn-outline">下一页 <i class="fas fa-chevron-right"></i></a>
-        {{end}}
+    <div class="pagination" th:if="${total_pages > 1}">
+        <a th:if="${page > 1}" th:href="@{/records(page=${page - 1}, keyword=${keyword})}" class="btn btn-outline"><i class="fas fa-chevron-left"></i> prev</a>
+        <span th:text="'page ' + ${page} + ' / ' + ${total_pages} + ' (total ' + ${total} + ')'">page</span>
+        <a th:if="${page < total_pages}" th:href="@{/records(page=${page + 1}, keyword=${keyword})}" class="btn btn-outline">next <i class="fas fa-chevron-right"></i></a>
     </div>
-    {{end}}
 </div>
-
 <script>
     async function retryTranscribe(id) {
-        if (!confirm('确认重新转写该记录？')) return;
+        if (!confirm('retry transcription?')) return;
         try {
-            const resp = await apiFetch('/api/records/' + id + '/transcribe', {method: 'POST'});
-            if (resp.ok) {
-                alert('转写完成，正在刷新...');
-                window.location.reload();
-            } else {
-                const data = await resp.json();
-                alert('转写失败: ' + (data.error || '未知错误'));
-            }
-        } catch (err) {
-            alert('转写失败: ' + err.message);
-        }
+            var resp = await apiFetch('/api/records/' + id + '/transcribe', {method: 'POST'});
+            if (resp.ok) { alert('transcription complete, reloading...'); window.location.reload(); }
+            else { var data = await resp.json(); alert('transcription failed: ' + (data.error || 'unknown error')); }
+        } catch (err) { alert('transcription failed: ' + err.message); }
     }
-
-    function retryInspect(id) {
-        // 质检需选择模板，跳转到详情页操作
-        window.location.href = '/records/' + id;
-    }
+    function retryInspect(id) { window.location.href = '/records/' + id; }
 </script>
-{{end}}{{template "layout" .}}
+</th:block></body></html>

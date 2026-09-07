@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/zngp/server/internal/logx"
+	"github.com/zngp/server/internal/model"
 	"github.com/zngp/server/internal/service"
 	"github.com/zngp/server/internal/store"
 )
@@ -48,24 +49,32 @@ func (h *InspectionHandler) Inspect(c *gin.Context) {
 		return
 	}
 
-	// Run inspection (in background would be better, but for MVP we do it synchronously)
+	// Run inspection asynchronously so the HTTP request does not block on the LLM call.
+	// The client polls GET /records/:id (or /inspections/:id) to observe completion.
 	logx.Info("llm_inspection_start", "record", recordID, "template_id", req.TemplateID)
-	result, err := h.svc.Run(record, req.TemplateID)
+	go h.runInspectionInBackground(record, req.TemplateID)
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"record_id":  recordID,
+		"status":     "PROCESSING",
+		"message":    "质检已开始，正在后台处理...",
+	})
+}
+
+// runInspectionInBackground executes the LLM inspection and updates the record status.
+func (h *InspectionHandler) runInspectionInBackground(record *model.Record, templateID int64) {
+	result, err := h.svc.Run(record, templateID)
 	if err != nil {
-		logx.Error("llm_inspection_failed", "record", recordID, "err", err)
-		h.store.UpdateRecordInspectionStatus(recordID, "FAILED")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "质检失败: " + err.Error()})
+		logx.Error("llm_inspection_failed", "record", record.ID, "err", err)
+		h.store.UpdateRecordInspectionStatus(record.ID, "FAILED")
 		return
 	}
 
-	// Update record status
-	if err := h.store.UpdateRecordInspectionStatus(recordID, "COMPLETED"); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新状态失败"})
-		return
+	if err := h.store.UpdateRecordInspectionStatus(record.ID, "COMPLETED"); err != nil {
+		logx.Error("llm_inspection_status_update_failed", "record", record.ID, "err", err)
 	}
 
-	logx.Info("llm_inspection_done", "record", recordID, "conclusion", result.OverallConclusion, "score", result.OverallScore, "tokens", result.TokensUsed)
-	c.JSON(http.StatusOK, result)
+	logx.Info("llm_inspection_done", "record", record.ID, "conclusion", result.OverallConclusion, "score", result.OverallScore, "tokens", result.TokensUsed)
 }
 
 func (h *InspectionHandler) GetResult(c *gin.Context) {

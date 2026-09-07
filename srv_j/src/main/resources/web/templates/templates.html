@@ -1,66 +1,50 @@
-{{define "content_templates"}}
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"></head>
+<body><th:block th:fragment="content">
 <div class="page-header">
-    <h1><i class="fas fa-clipboard-check"></i> 检查项模板</h1>
+    <h1><i class="fas fa-clipboard-check"></i> templates</h1>
 </div>
-
 <div class="section">
-    {{if .templates}}
+    <th:block th:if="${!#lists.isEmpty(templates)}">
     <div class="tabs">
-        {{range $i, $t := .templates}}
-        <button class="tab-btn {{if eq $i 0}}active{{end}}" data-tab="tpl-{{$t.ID}}" onclick="switchTab('tpl-{{$t.ID}}', this)">
-            <i class="fas fa-clipboard-list"></i> {{$t.Name}}
+        <button th:each="t, st : ${templates}" class="tab-btn" th:classappend="${st.index == 0} ? 'active'"
+                th:attr="data-tab='tpl-' + ${t.id}, onclick='switchTab(\'tpl-' + ${t.id} + '\', this)'">
+            <i class="fas fa-clipboard-list"></i> <span th:text="${t.name}">name</span>
         </button>
-        {{end}}
     </div>
-
-    {{range $i, $t := .templates}}
-    <div class="tab-panel {{if eq $i 0}}active{{end}}" id="tpl-{{$t.ID}}">
+    <div th:each="t, st : ${templates}" class="tab-panel" th:classappend="${st.index == 0} ? 'active'" th:attr="id='tpl-' + ${t.id}">
         <div class="template-header">
-            <p class="template-desc">{{$t.Description}}</p>
-            <span class="badge badge-blue">{{$t.Category}}</span>
+            <p class="template-desc" th:text="${t.description}">desc</p>
+            <span class="badge badge-blue" th:text="${t.category}">category</span>
         </div>
         <div class="template-items">
             <table class="table">
-                <thead>
-                    <tr>
-                        <th style="width:60px">序号</th>
-                        <th>检查项</th>
-                        <th>分类</th>
-                        <th>必检</th>
-                        <th>权重</th>
-                    </tr>
-                </thead>
+                <thead><tr><th style="width:60px">no.</th><th>item</th><th>category</th><th>required</th><th>weight</th></tr></thead>
                 <tbody>
-                    {{range $t.Items}}
-                    <tr>
-                        <td>{{.ItemNumber}}</td>
-                        <td><strong>{{.Name}}</strong>{{if .Description}}<br><small class="text-muted">{{.Description}}</small>{{end}}</td>
-                        <td>{{.Category}}</td>
-                        <td>{{if .IsRequired}}<i class="fas fa-check" style="color:var(--green)"></i>{{else}}<i class="fas fa-minus" style="color:var(--gray)"></i>{{end}}</td>
-                        <td>{{.Weight}}</td>
+                    <tr th:each="it : ${t.items}">
+                        <td th:text="${it.itemNumber}">1</td>
+                        <td><strong th:text="${it.name}">name</strong><br th:if="${it.description != null and !it.description.isEmpty()}"><small th:if="${it.description != null and !it.description.isEmpty()}" class="text-muted" th:text="${it.description}">desc</small></td>
+                        <td th:text="${it.category}">category</td>
+                        <td><i th:if="${it.isRequired}" class="fas fa-check" style="color:var(--green)"></i><i th:unless="${it.isRequired}" class="fas fa-minus" style="color:var(--gray)"></i></td>
+                        <td th:text="${it.weight}">1</td>
                     </tr>
-                    {{end}}
                 </tbody>
             </table>
         </div>
-        <a href="/templates/{{$t.ID}}/edit" class="btn btn-outline"><i class="fas fa-edit"></i> 编辑</a>
+        <a th:href="@{/templates/{id}/edit(id=${t.id})}" class="btn btn-outline"><i class="fas fa-edit"></i> edit</a>
     </div>
-    {{end}}
-    {{else}}
-    <div class="empty-state">
-        <i class="fas fa-clipboard"></i>
-        <p>暂无模板</p>
+    </th:block>
+    <div th:if="${#lists.isEmpty(templates)}" class="empty-state">
+        <i class="fas fa-clipboard"></i><p>no templates</p>
     </div>
-    {{end}}
 </div>
-
 <script>
     function switchTab(tabId, btn) {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
         btn.classList.add('active');
         document.getElementById(tabId).classList.add('active');
     }
 </script>
-{{end}}
-{{template "layout" .}}
+</th:block></body></html>

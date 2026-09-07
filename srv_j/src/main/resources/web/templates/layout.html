@@ -1,10 +1,9 @@
-{{define "layout"}}
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org" th:fragment="layout">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.title}} - {{sysName}}</title>
+    <title th:text="${title} + ' - ' + ${sysName}">title</title>
     <link rel="stylesheet" href="/static/lib/font-awesome.all.min.css">
     <link rel="stylesheet" href="/static/css/style.css?v=3">
 </head>
@@ -13,54 +12,48 @@
         <aside class="sidebar">
             <a href="/" class="sidebar-brand">
                 <i class="fas fa-microphone-alt"></i>
-                <span>{{sysName}}</span>
+                <span th:text="${sysName}">system</span>
             </a>
-
             <nav class="sidebar-nav">
-                <div class="nav-group-title">业务管理</div>
-                <a href="/" class="side-link {{if eq .content_block "content_dashboard"}}active{{end}}">
-                    <i class="fas fa-tachometer-alt"></i> 仪表盘
+                <div class="nav-group-title">business</div>
+                <a href="/" class="side-link" th:classappend="${content_block == 'content_dashboard'} ? 'active'">
+                    <i class="fas fa-tachometer-alt"></i> dashboard
                 </a>
-                <a href="/upload" class="side-link {{if eq .content_block "content_upload"}}active{{end}}">
-                    <i class="fas fa-cloud-upload-alt"></i> 资料上传
+                <a href="/upload" class="side-link" th:classappend="${content_block == 'content_upload'} ? 'active'">
+                    <i class="fas fa-cloud-upload-alt"></i> upload
                 </a>
-                <a href="/records" class="side-link {{if eq .content_block "content_records"}}active{{end}} {{if eq .content_block "content_record_detail"}}active{{end}}">
-                    <i class="fas fa-list-alt"></i> 记录列表
+                <a href="/records" class="side-link"
+                   th:classappend="${content_block == 'content_records' or content_block == 'content_record_detail'} ? 'active'">
+                    <i class="fas fa-list-alt"></i> records
                 </a>
-                <a href="/templates" class="side-link {{if eq .content_block "content_templates"}}active{{end}} {{if eq .content_block "content_template_edit"}}active{{end}}">
-                    <i class="fas fa-clipboard-check"></i> 检查项模板
+                <a href="/templates" class="side-link"
+                   th:classappend="${content_block == 'content_templates' or content_block == 'content_template_edit'} ? 'active'">
+                    <i class="fas fa-clipboard-check"></i> templates
                 </a>
-
-                <div class="nav-group-title">系统</div>
-                <a href="/config" class="side-link {{if eq .content_block "content_config"}}active{{end}}">
-                    <i class="fas fa-cog"></i> 系统配置
+                <div class="nav-group-title">system</div>
+                <a href="/config" class="side-link" th:classappend="${content_block == 'content_config'} ? 'active'">
+                    <i class="fas fa-cog"></i> config
                 </a>
             </nav>
-
             <div class="sidebar-footer">
                 <a href="/logout" class="side-link side-link-danger">
-                    <i class="fas fa-sign-out-alt"></i> 退出登录
+                    <i class="fas fa-sign-out-alt"></i> logout
                 </a>
             </div>
         </aside>
-
         <div class="main-area">
             <main class="main-content">
-                {{template "content" .}}
+                <th:block th:insert="${content_template} :: content" />
             </main>
         </div>
     </div>
     <script>
-        // 认证已由 Cookie 处理，API 请求自动携带 Cookie
         function apiFetch(url, options) {
-            const opts = options || {};
-            opts.headers = Object.assign({}, opts.headers || {}, {
-                'Content-Type': 'application/json'
-            });
+            var opts = options || {};
+            opts.headers = Object.assign({}, opts.headers || {}, {'Content-Type': 'application/json'});
             opts.credentials = 'same-origin';
             return fetch(url, opts);
         }
     </script>
 </body>
 </html>
-{{end}}

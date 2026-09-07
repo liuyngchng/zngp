@@ -1,8 +1,10 @@
-{{define "content_error"}}
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"></head>
+<body><th:block th:fragment="content">
 <div class="error-page">
-    <h1><i class="fas fa-exclamation-triangle"></i> 出错了</h1>
-    <p class="error-message" style="color:var(--text-muted);margin-bottom:16px;">{{.error}}</p>
-    <a href="/" class="btn btn-primary"><i class="fas fa-home"></i> 返回首页</a>
+    <h1><i class="fas fa-exclamation-triangle"></i> error</h1>
+    <p class="error-message" style="color:var(--text-muted);margin-bottom:16px;" th:text="${error}">error</p>
+    <a href="/" class="btn btn-primary"><i class="fas fa-home"></i> home</a>
 </div>
-{{end}}
-{{template "layout" .}}
+</th:block></body></html>

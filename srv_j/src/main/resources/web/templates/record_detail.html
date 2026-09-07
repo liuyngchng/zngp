@@ -1,179 +1,123 @@
-{{define "content_record_detail"}}
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"></head>
+<body><th:block th:fragment="content">
 <div class="page-header">
-    <h1><i class="fas fa-file-audio"></i> 记录详情</h1>
-    <a href="/records" class="btn btn-outline"><i class="fas fa-arrow-left"></i> 返回列表</a>
+    <h1><i class="fas fa-file-audio"></i> record detail</h1>
+    <a href="/records" class="btn btn-outline"><i class="fas fa-arrow-left"></i> back</a>
 </div>
-
 <div class="detail-grid">
     <div class="detail-section">
-        <h2><i class="fas fa-info-circle"></i> 基本信息</h2>
+        <h2><i class="fas fa-info-circle"></i> info</h2>
         <dl class="detail-list">
-            <dt>客户姓名</dt><dd>{{.record.CustomerName}}</dd>
-            <dt>安检员</dt><dd>{{.record.InspectorName}}</dd>
-            <dt>客户地址</dt><dd>{{.record.CustomerAddress}}</dd>
-            <dt>安检日期</dt><dd>{{.record.InspectionDate.Format "2006-01-02 15:04"}}</dd>
-            <dt>音频时长</dt><dd>{{printf "%.0f" .record.AudioDuration}} 秒</dd>
+            <dt>customer</dt><dd th:text="${record.customerName}">-</dd>
+            <dt>inspector</dt><dd th:text="${record.inspectorName}">-</dd>
+            <dt>address</dt><dd th:text="${record.customerAddress}">-</dd>
+            <dt>date</dt><dd th:text="${#temporals.format(record.inspectionDate, 'yyyy-MM-dd HH:mm')}">-</dd>
+            <dt>duration</dt><dd th:text="${#numbers.formatInteger(record.audioDuration)} + ' s'">0s</dd>
         </dl>
-
-        <h3><i class="fas fa-play-circle"></i> 音频播放</h3>
-        <audio controls class="audio-player" id="audioPlayer" preload="none">
-        </audio>
-
-        <h3><i class="fas fa-file-alt"></i> 转写文本</h3>
-        {{if .record.TranscriptText}}
-        <div class="transcript-text">{{.record.TranscriptText}}</div>
-        {{else if eq .record.TranscriptStatus "FAILED"}}
-        <div class="empty-state">
+        <h3><i class="fas fa-play-circle"></i> audio</h3>
+        <audio controls class="audio-player" id="audioPlayer" preload="none"></audio>
+        <h3><i class="fas fa-file-alt"></i> transcript</h3>
+        <div th:if="${record.transcriptText != null and !record.transcriptText.isEmpty()}" class="transcript-text" th:text="${record.transcriptText}">text</div>
+        <div th:if="${record.transcriptStatus == 'FAILED'}" class="empty-state">
             <i class="fas fa-exclamation-triangle" style="color:#f59e0b;"></i>
-            <p>转写失败</p>
-            <button class="btn btn-primary" onclick="transcribeRecord('{{.record.ID}}')"><i class="fas fa-redo"></i> 重试转写</button>
+            <p>transcription failed</p>
+            <button class="btn btn-primary" th:attr="onclick='transcribeRecord(\'' + ${record.id} + '\')'"><i class="fas fa-redo"></i> retry</button>
         </div>
-        {{else if eq .record.TranscriptStatus "PROCESSING"}}
-        <div class="empty-state">
+        <div th:if="${record.transcriptStatus == 'PROCESSING'}" class="empty-state">
+            <i class="fas fa-spinner fa-pulse"></i><p>transcribing...</p>
+        </div>
+        <div th:if="${record.transcriptStatus == 'PENDING' or record.transcriptStatus == 'NONE'}" class="empty-state">
             <i class="fas fa-spinner fa-pulse"></i>
-            <p>正在转写中...</p>
+            <p>not transcribed</p>
+            <button class="btn btn-primary" th:attr="onclick='transcribeRecord(\'' + ${record.id} + '\')'"><i class="fas fa-play"></i> transcribe</button>
         </div>
-        {{else}}
-        <div class="empty-state">
-            <i class="fas fa-spinner fa-pulse"></i>
-            <p>尚未转写</p>
-            <button class="btn btn-primary" onclick="transcribeRecord('{{.record.ID}}')"><i class="fas fa-play"></i> 开始转写</button>
-        </div>
-        {{end}}
     </div>
-
     <div class="detail-section">
-        <h2><i class="fas fa-robot"></i> AI 质检</h2>
-        {{if .inspection}}
+        <h2><i class="fas fa-robot"></i> AI inspection</h2>
+        <th:block th:if="${inspection != null}">
         <div class="inspection-summary">
-            <div class="conclusion conclusion-{{conclusionClass .inspection.OverallConclusion}}">
-                <i class="fas fa-gavel"></i> 结论：{{.inspection.OverallConclusion}}
+            <div class="conclusion" th:classappend="'conclusion-' + ${inspection.overallConclusion}">
+                <i class="fas fa-gavel"></i> conclusion: <span th:text="${inspection.overallConclusion}">-</span>
             </div>
-            <div class="score"><i class="fas fa-chart-bar"></i> 综合评分：{{.inspection.OverallScore}} 分</div>
-            <div class="inspection-summary-text">{{.inspection.Summary}}</div>
+            <div class="score"><i class="fas fa-chart-bar"></i> score: <span th:text="${inspection.overallScore}">0</span></div>
+            <div class="inspection-summary-text" th:text="${inspection.summary}">summary</div>
         </div>
-
-        <h3><i class="fas fa-list-ul"></i> 逐项检查结果</h3>
+        <h3><i class="fas fa-list-ul"></i> item results</h3>
         <table class="table">
-            <thead>
-                <tr>
-                    <th>检查项</th>
-                    <th>判定</th>
-                    <th>置信度</th>
-                    <th>证据</th>
-                </tr>
-            </thead>
+            <thead><tr><th>item</th><th>verdict</th><th>confidence</th><th>evidence</th></tr></thead>
             <tbody>
-                {{range .inspection.Items}}
-                <tr>
-                    <td>{{.ItemName}}</td>
-                    <td><span class="badge badge-{{verdictClass .Verdict}}">{{.Verdict}}</span></td>
-                    <td>{{printf "%.0f%%" (mul .Confidence 100)}}</td>
-                    <td class="evidence-text">{{.Evidence}}</td>
+                <tr th:each="ir : ${inspection.items}">
+                    <td th:text="${ir.itemName}">-</td>
+                    <td><span class="badge" th:classappend="'badge-' + ${ir.verdict}" th:text="${ir.verdict}">-</span></td>
+                    <td th:text="${#numbers.formatDecimal(ir.confidence * 100, 0, 0)} + '%'">0%</td>
+                    <td class="evidence-text" th:text="${ir.evidence}">-</td>
                 </tr>
-                {{end}}
             </tbody>
         </table>
-        {{else if eq .record.InspectionStatus "FAILED"}}
-        <div class="empty-state">
-            <i class="fas fa-exclamation-triangle" style="color:#f59e0b;"></i>
-            <p>质检失败</p>
-            {{if .record.TranscriptText}}
-            <form onsubmit="inspectRecord(event, '{{.record.ID}}')">
+        </th:block>
+        <div th:if="${inspection == null and record.inspectionStatus == 'FAILED'}" class="empty-state">
+            <i class="fas fa-exclamation-triangle" style="color:#f59e0b;"></i><p>inspection failed</p>
+            <form th:if="${record.transcriptText != null and !record.transcriptText.isEmpty()}" th:attr="onsubmit='inspectRecord(event, \'' + ${record.id} + '\')'">
                 <div class="form-group">
-                    <label for="templateSelect"><i class="fas fa-clipboard-check"></i> 选择检查项模板</label>
+                    <label><i class="fas fa-clipboard-check"></i> select template</label>
                     <select id="templateSelect" class="form-select">
-                        {{range .templates}}
-                        <option value="{{.ID}}">{{.Name}}</option>
-                        {{end}}
+                        <option th:each="t : ${templates}" th:value="${t.id}" th:text="${t.name}">template</option>
                     </select>
                 </div>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-redo"></i> 重试质检</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-redo"></i> retry</button>
             </form>
-            {{else}}
-            <p class="text-muted"><i class="fas fa-info-circle"></i> 请先完成转写</p>
-            {{end}}
+            <p th:unless="${record.transcriptText != null and !record.transcriptText.isEmpty()}" class="text-muted">transcribe first</p>
         </div>
-        {{else if eq .record.InspectionStatus "PROCESSING"}}
-        <div class="empty-state">
-            <i class="fas fa-spinner fa-pulse"></i>
-            <p>正在质检中...</p>
+        <div th:if="${inspection == null and record.inspectionStatus == 'PROCESSING'}" class="empty-state">
+            <i class="fas fa-spinner fa-pulse"></i><p>inspecting...</p>
         </div>
-        {{else}}
-        <div class="empty-state">
-            <i class="fas fa-robot"></i>
-            <p>尚未质检</p>
-            {{if .record.TranscriptText}}
-            <form onsubmit="inspectRecord(event, '{{.record.ID}}')">
+        <div th:if="${inspection == null and record.inspectionStatus != 'FAILED' and record.inspectionStatus != 'PROCESSING'}" class="empty-state">
+            <i class="fas fa-robot"></i><p>not inspected</p>
+            <form th:if="${record.transcriptText != null and !record.transcriptText.isEmpty()}" th:attr="onsubmit='inspectRecord(event, \'' + ${record.id} + '\')'">
                 <div class="form-group">
-                    <label for="templateSelect"><i class="fas fa-clipboard-check"></i> 选择检查项模板</label>
+                    <label><i class="fas fa-clipboard-check"></i> select template</label>
                     <select id="templateSelect" class="form-select">
-                        {{range .templates}}
-                        <option value="{{.ID}}">{{.Name}}</option>
-                        {{end}}
+                        <option th:each="t : ${templates}" th:value="${t.id}" th:text="${t.name}">template</option>
                     </select>
                 </div>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-robot"></i> 开始质检</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-robot"></i> inspect</button>
             </form>
-            {{else}}
-            <p class="text-muted"><i class="fas fa-info-circle"></i> 请先完成转写</p>
-            {{end}}
+            <p th:unless="${record.transcriptText != null and !record.transcriptText.isEmpty()}" class="text-muted">transcribe first</p>
         </div>
-        {{end}}
     </div>
 </div>
-
 <script>
     async function transcribeRecord(id) {
-        if (!confirm('确认开始转写？')) return;
+        if (!confirm('start transcription?')) return;
         try {
-            const resp = await apiFetch('/api/records/' + id + '/transcribe', {method: 'POST'});
-            if (resp.ok) {
-                alert('转写完成，正在刷新...');
-                window.location.reload();
-            } else {
-                const data = await resp.json();
-                alert('转写失败: ' + (data.error || '未知错误'));
-            }
-        } catch (err) {
-            alert('转写失败: ' + err.message);
-        }
+            var resp = await apiFetch('/api/records/' + id + '/transcribe', {method: 'POST'});
+            if (resp.ok) { alert('transcription complete, reloading...'); window.location.reload(); }
+            else { var data = await resp.json(); alert('transcription failed: ' + (data.error || 'unknown error')); }
+        } catch (err) { alert('transcription failed: ' + err.message); }
     }
-
     async function inspectRecord(e, id) {
         e.preventDefault();
-        const templateId = document.getElementById('templateSelect').value;
-        if (!templateId) { alert('请选择模板'); return; }
-        if (!confirm('确认开始 AI 质检？')) return;
+        var templateId = document.getElementById('templateSelect').value;
+        if (!templateId) { alert('select a template'); return; }
+        if (!confirm('start AI inspection?')) return;
         try {
-            const resp = await apiFetch('/api/records/' + id + '/inspect', {
-                method: 'POST',
-                body: JSON.stringify({template_id: parseInt(templateId)})
+            var resp = await apiFetch('/api/records/' + id + '/inspect', {
+                method: 'POST', body: JSON.stringify({template_id: parseInt(templateId)})
             });
-            if (resp.ok) {
-                alert('质检完成，正在刷新...');
-                window.location.reload();
-            } else {
-                const data = await resp.json();
-                alert('质检失败: ' + (data.error || '未知错误'));
-            }
-        } catch (err) {
-            alert('质检失败: ' + err.message);
-        }
+            if (resp.ok) { alert('inspection complete, reloading...'); window.location.reload(); }
+            else { var data = await resp.json(); alert('inspection failed: ' + (data.error || 'unknown error')); }
+        } catch (err) { alert('inspection failed: ' + err.message); }
     }
-
-    // 音频播放：Cookie 已自动鉴权
     document.addEventListener('DOMContentLoaded', function() {
-        const audio = document.getElementById('audioPlayer');
+        var audio = document.getElementById('audioPlayer');
         if (audio) {
-            fetch('/api/records/{{.record.ID}}/audio', {credentials: 'same-origin'})
-                .then(resp => {
-                    if (resp.ok) return resp.blob();
-                    throw new Error('加载音频失败');
-                })
-                .then(blob => { audio.src = URL.createObjectURL(blob); })
-                .catch(err => { console.error(err); });
+            fetch('/api/records/' + /*[[${record.id}]]*/ '' + '/audio', {credentials: 'same-origin'})
+                .then(function(resp) { if (resp.ok) return resp.blob(); throw new Error('audio load failed'); })
+                .then(function(blob) { audio.src = URL.createObjectURL(blob); })
+                .catch(function(err) { console.error(err); });
         }
     });
 </script>
-{{end}}{{template "layout" .}}
+</th:block></body></html>

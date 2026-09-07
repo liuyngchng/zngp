@@ -31,7 +31,7 @@ public class App {
             }
 
             Config cfg = Config.load(cfgPath);
-            log.info("配置加载完成: system={}", cfg.system.name);
+            log.info("config_loaded: system={}", cfg.system.name);
 
             // Initialize store
             Store store = new Store(cfg.database.path);
@@ -39,7 +39,7 @@ public class App {
 
             // Ensure default admin user
             ensureDefaultAdmin(store);
-            log.info("默认管理员已就绪");
+            log.info("default_admin_ready");
 
             // Seed templates
             seedTemplates(store);
@@ -50,7 +50,7 @@ public class App {
             server.start(cfg.server.host, port);
 
         } catch (Exception e) {
-            log.error("启动失败", e);
+            log.error("startup_failed", e);
             System.exit(1);
         }
     }
@@ -76,12 +76,12 @@ public class App {
             store.createUser(user);
 
             log.info("============================================");
-            log.info("  初始管理员密码: {}", password);
-            log.info("  有效期: 2小时 (至 {})", user.passwordExpiresAt);
-            log.info("  首次登录后必须修改密码");
+            log.info("  initial_admin_password: {}", password);
+            log.info("  expires_in: 2 hours (until {})", user.passwordExpiresAt);
+            log.info("  must_change_password_on_first_login");
             log.info("============================================");
         } catch (Exception e) {
-            log.error("创建默认管理员失败", e);
+            log.error("default_admin_create_failed", e);
         }
     }
 
@@ -110,9 +110,9 @@ public class App {
             for (InspectionTemplate t : defaultTemplates) {
                 store.createTemplate(t);
             }
-            log.info("检查项模板已初始化");
+            log.info("templates_seeded");
         } catch (Exception e) {
-            log.warn("种子模板插入失败: {}", e.getMessage());
+            log.warn("seed_template_insert_failed: {}", e.getMessage());
         }
     }
 
