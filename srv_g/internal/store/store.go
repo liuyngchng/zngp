@@ -5,8 +5,10 @@ import (
 	"path/filepath"
 
 	"github.com/glebarez/sqlite"
+	"github.com/zngp/server/config"
 	"github.com/zngp/server/internal/logx"
 	"github.com/zngp/server/internal/model"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -16,14 +18,34 @@ type Store struct {
 	DB *gorm.DB
 }
 
-func New(dbPath string) (*Store, error) {
-	// Ensure directory exists
-	dir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, err
+// New opens a database connection based on cfg.
+// If cfg.Type is "mysql" and a DSN is configured, MySQL is used;
+// otherwise it falls back to SQLite (the default).
+func New(cfg config.DatabaseConfig) (*Store, error) {
+	var dialector gorm.Dialector
+
+	if cfg.Type == "mysql" && cfg.DSN != "" {
+		dialector = mysql.Open(cfg.DSN)
+	} else {
+		if cfg.Type == "mysql" && cfg.DSN == "" {
+			logx.Warn("mysql_dsn_empty_falling_back_to_sqlite")
+		}
+
+		dbPath := cfg.Path
+		if dbPath == "" {
+			dbPath = "./data/voice_note.db"
+		}
+
+		// Ensure directory exists
+		dir := filepath.Dir(dbPath)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, err
+		}
+
+		dialector = sqlite.Open(dbPath)
 	}
 
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
+	db, err := gorm.Open(dialector, &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Warn),
 	})
 	if err != nil {
@@ -31,7 +53,9 @@ func New(dbPath string) (*Store, error) {
 	}
 
 	// Enable foreign keys for SQLite
-	db.Exec("PRAGMA foreign_keys = ON")
+	if cfg.Type != "mysql" {
+		db.Exec("PRAGMA foreign_keys = ON")
+	}
 
 	s := &Store{DB: db}
 	if err := s.Migrate(); err != nil {

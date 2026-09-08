@@ -28,7 +28,9 @@ type SystemConfig struct {
 }
 
 type DatabaseConfig struct {
-	Path string `yaml:"path"`
+	Type string `yaml:"type"` // "sqlite" (default) or "mysql"
+	Path string `yaml:"path"` // SQLite file path, used when type is empty or "sqlite"
+	DSN  string `yaml:"dsn"`  // MySQL DSN, used when type is "mysql"
 }
 
 type AuthConfig struct {

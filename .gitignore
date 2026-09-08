@@ -67,6 +67,13 @@ ios/VoiceNote/Libraries/
 # 离线 ASR 模型文件（体积大，不提交 git）
 models/
 
+# ===== Go server (srv_g) =====
+srv_g/server
+srv_g/*.exe
+srv_g/data/
+srv_g/*.db
+srv_g/vendor/
+
 # ===== Java / Maven (srv_j) =====
 target/
 *.class
@@ -77,6 +84,10 @@ target/
 # Maven 本地构建产物
 srv_j/data/
 srv_j/*.db
+
+# Config (real credentials; template is committed)
+srv_j/cfg.yml
+srv_g/cfg.yml
 
 # ===== Claude Code =====
 .claude/settings.local.json

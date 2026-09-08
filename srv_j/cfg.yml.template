@@ -1,14 +1,15 @@
 server:
   port: "8080"
   host: "0.0.0.0"
-  log_level: "info"
-  log_format: "text"
 
 system:
   name: "客户服务质量平台"
 
 database:
-  path: "./data/voice_note.db"
+  # 数据库类型: sqlite (默认) / mysql。配置 mysql 时使用 MySQL，否则使用 SQLite。
+  # type: "mysql"
+  # dsn: "user:password@tcp(127.0.0.1:3306)/zngp?charset=utf8mb4&parseTime=True&loc=Local"
+  path: "./data/zngp.db"
 
 auth:
   username: "admin"

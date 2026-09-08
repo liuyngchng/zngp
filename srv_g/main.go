@@ -32,8 +32,8 @@ func main() {
 	// Initialize logging (level: debug/info/warn/error, format: text/json)
 	logx.Init(logx.Level(cfg.Server.LogLevel), cfg.Server.LogFormat)
 
-	// Initialize store
-	st, err := store.New(cfg.Database.Path)
+	// Initialize store (SQLite by default; MySQL if configured)
+	st, err := store.New(cfg.Database)
 	if err != nil {
 		logx.Fatal("store_init_failed", "err", err)
 	}

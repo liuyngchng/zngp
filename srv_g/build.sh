@@ -97,7 +97,12 @@ info "准备构建上下文: $BUILD_DIR"
 
 cp "$SCRIPT_DIR/$BINARY" "$BUILD_DIR/"
 cp "$SCRIPT_DIR/Dockerfile" "$BUILD_DIR/"
-cp "$SCRIPT_DIR/cfg.yml" "$BUILD_DIR/"
+# 镜像内只放占位配置（由 cfg.yml.template 生成），真实密钥一律通过运行时挂载注入，绝不打包进镜像
+if [[ ! -f "$SCRIPT_DIR/cfg.yml.template" ]]; then
+    err "缺少 cfg.yml.template，无法生成默认配置"
+    exit 1
+fi
+cp "$SCRIPT_DIR/cfg.yml.template" "$BUILD_DIR/cfg.yml"
 cp -r "$SCRIPT_DIR/web" "$BUILD_DIR/web"
 cp -r "$SCRIPT_DIR/seed" "$BUILD_DIR/seed"
 
@@ -128,8 +133,8 @@ info "打包 release..."
 # docker save 镜像
 docker save -o "$RELEASE_DIR/${IMAGE_NAME}.tar" "$FULL_IMAGE"
 
-# 配置文件
-cp "$SCRIPT_DIR/cfg.yml" "$RELEASE_DIR/cfg.yml"
+# 配置文件（使用模板，真实密钥由部署者填写）
+cp "$SCRIPT_DIR/cfg.yml.template" "$RELEASE_DIR/cfg.yml"
 
 # 启动脚本
 cat > "$RELEASE_DIR/start.sh" << 'STARTSCRIPT'
