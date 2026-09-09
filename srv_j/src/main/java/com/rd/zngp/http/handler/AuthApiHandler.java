@@ -84,7 +84,7 @@ public class AuthApiHandler {
             // Validate password strength
             String weakMsg = validatePassword(newPassword);
             if (weakMsg != null) {
-                log.warn("change_password_failed_weak_password: username={}", auth.username);
+                log.warn("change_password_failed_weak_password: username={}, reason={}", auth.username, weakMsg);
                 HttpHelpers.sendAndClose(ctx, req, HttpHelpers.json(400, HttpHelpers.errorMap(weakMsg)));
                 return;
             }
