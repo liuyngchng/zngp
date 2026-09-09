@@ -42,6 +42,12 @@ public class Config {
 
         @JsonProperty("host")
         public String host = "0.0.0.0";
+
+        @JsonProperty("cert_file")
+        public String certFile = "./data/server.crt";
+
+        @JsonProperty("key_file")
+        public String keyFile = "./data/server.key";
     }
 
     public static class SystemConfig {
@@ -50,8 +56,20 @@ public class Config {
     }
 
     public static class DatabaseConfig {
+        @JsonProperty("type")
+        public String type = "sqlite"; // "sqlite" (default) or "mysql"
+
         @JsonProperty("path")
         public String path = "./data/zngp.db";
+
+        @JsonProperty("dsn")
+        public String dsn = ""; // MySQL DSN, used when type is "mysql"
+
+        @JsonProperty("username")
+        public String username = "";
+
+        @JsonProperty("password")
+        public String password = "";
     }
 
     public static class AuthConfig {
@@ -120,7 +138,10 @@ public class Config {
         // Apply defaults
         if (cfg.server.port == null || cfg.server.port.isEmpty()) cfg.server.port = "8080";
         if (cfg.server.host == null || cfg.server.host.isEmpty()) cfg.server.host = "0.0.0.0";
+        if (cfg.server.certFile == null || cfg.server.certFile.isEmpty()) cfg.server.certFile = "./data/server.crt";
+        if (cfg.server.keyFile == null || cfg.server.keyFile.isEmpty()) cfg.server.keyFile = "./data/server.key";
         if (cfg.system.name == null || cfg.system.name.isEmpty()) cfg.system.name = "ZNGP 服务质量平台";
+        if (cfg.database.type == null || cfg.database.type.isEmpty()) cfg.database.type = "sqlite";
         if (cfg.database.path == null || cfg.database.path.isEmpty()) cfg.database.path = "./data/zngp.db";
         if (cfg.upload.maxFileSizeMB == 0) cfg.upload.maxFileSizeMB = 100;
         if (cfg.upload.storageDir == null || cfg.upload.storageDir.isEmpty()) cfg.upload.storageDir = "./data/uploads";

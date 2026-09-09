@@ -74,6 +74,11 @@ srv_g/data/
 srv_g/*.db
 srv_g/vendor/
 
+# 自动生成的自签名证书（勿提交）
+srv_g/**/*.crt
+srv_g/**/*.key
+srv_g/**/*.pem
+
 # ===== Java / Maven (srv_j) =====
 target/
 *.class
@@ -84,6 +89,11 @@ target/
 # Maven 本地构建产物
 srv_j/data/
 srv_j/*.db
+
+# 自动生成的自签名证书（勿提交）
+srv_j/**/*.crt
+srv_j/**/*.key
+srv_j/**/*.pem
 
 # Config (real credentials; template is committed)
 srv_j/cfg.yml

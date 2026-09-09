@@ -8,10 +8,13 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.InputStream;
 import java.util.Map;
 
@@ -72,9 +75,11 @@ public class NettyHttpServer {
     // Server lifecycle
     // ============================================================
 
-    public void start(String host, int port) throws InterruptedException {
+    public void start(String host, int port, String certFile, String keyFile) throws Exception {
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
+
+        SslContext sslCtx = SslContextBuilder.forServer(new File(certFile), new File(keyFile)).build();
 
         try {
             ServerBootstrap b = new ServerBootstrap();
@@ -84,6 +89,7 @@ public class NettyHttpServer {
                     @Override
                     protected void initChannel(SocketChannel ch) {
                         ch.pipeline()
+                            .addLast(sslCtx.newHandler(ch.alloc()))
                             .addLast(new HttpServerCodec())
                             .addLast(new ChunkedWriteHandler())
                             .addLast(new HttpObjectAggregator(200 * 1024 * 1024))
@@ -93,8 +99,8 @@ public class NettyHttpServer {
                 .option(ChannelOption.SO_BACKLOG, 128)
                 .childOption(ChannelOption.SO_KEEPALIVE, true);
 
-            log.info("server_starting: http://{}:{}", host, port);
-            log.info("server_access_url: http://127.0.0.1:{}", port);
+            log.info("server_starting: https://{}:{}", host, port);
+            log.info("server_access_url: https://127.0.0.1:{}", port);
             ChannelFuture f = b.bind(host, port).sync();
             f.channel().closeFuture().sync();
         } finally {

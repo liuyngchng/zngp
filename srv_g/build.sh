@@ -1,46 +1,46 @@
 #!/bin/bash
 # ============================================================
-# build.sh — 构建 zngp-server Docker 镜像
+# build.sh — Build zngp-server Docker image
 #
-# 用法:
-#   ./build.sh                  # 默认 tag: zngp-server:latest
-#   ./build.sh v1.0.0           # 指定版本
-#   ./build.sh v1.0.0 --push    # 构建并推送
+# Usage:
+#   ./build.sh                  # default tag: zngp-server:latest
+#   ./build.sh v1.0.0           # specify version
+#   ./build.sh v1.0.0 --push    # build and push
 #
-# 流程:
-#   1. 本地 (Ubuntu) 静态编译 Go 二进制
-#   2. 打包进 Alpine 运行时镜像
-#   3. 打 release tar.gz 包（含镜像 + 配置 + 模板）
+# Flow:
+#   1. Statically compile Go binary locally (Ubuntu)
+#   2. Package into Alpine runtime image
+#   3. Create release tar.gz (image + config + templates)
 # ============================================================
 
 set -euo pipefail
 
-# ---- 配置 ----
+# ---- Config ----
 IMAGE_NAME="${IMAGE_NAME:-zngp-server}"
-REGISTRY="${REGISTRY:-}"                        # 镜像仓库地址
+REGISTRY="${REGISTRY:-}"                        # registry address
 BINARY="${BINARY:-server}"
 
-# ---- 颜色输出 ----
+# ---- Color output ----
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 info()  { echo -e "${GREEN}[INFO]${NC}  $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 err()   { echo -e "${RED}[ERR]${NC}   $*"; }
 
-# ---- 解析参数 ----
+# ---- Parse args ----
 TAG=""
 PUSH=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --push) PUSH=true ;;
         -h|--help)
-            echo "用法: $0 [<tag>] [--push]"
+            echo "Usage: $0 [<tag>] [--push]"
             echo ""
-            echo "  <tag>      镜像标签，默认 latest"
-            echo "  --push     构建后推送到仓库"
+            echo "  <tag>      image tag, default: latest"
+            echo "  --push     push to registry after build"
             echo ""
-            echo "环境变量:"
-            echo "  IMAGE_NAME   镜像名，默认 zngp-server"
-            echo "  REGISTRY     仓库地址"
+            echo "Env vars:"
+            echo "  IMAGE_NAME   image name, default: zngp-server"
+            echo "  REGISTRY     registry address"
             exit 0
             ;;
         *) TAG="$1" ;;
@@ -56,108 +56,104 @@ else
     FULL_IMAGE="${IMAGE_NAME}:${TAG}"
 fi
 
-# ---- 检查前提 ----
+# ---- Prerequisites ----
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if ! command -v go &>/dev/null; then
-    err "go 未安装或不在 PATH 中"
-    exit 1
-fi
-
-if ! command -v garble &>/dev/null; then
-    err "garble 未安装，请执行: go install mvdan.cc/garble@v0.14.2"
+    err "go is not installed or not in PATH"
     exit 1
 fi
 
 if ! command -v docker &>/dev/null; then
-    err "docker 未安装或不在 PATH 中"
+    err "docker is not installed or not in PATH"
     exit 1
 fi
 
-# ---- Step 1: 本地编译 ----
+# ---- Step 1: Compile ----
 cd "$SCRIPT_DIR"
 
-# 删除旧二进制
+# Remove old binary
 rm -f "$BINARY"
 
-info "本地编译 Go 二进制 (CGO_ENABLED=0, garble 混淆)..."
-GOTOOLCHAIN=local CGO_ENABLED=0 garble -literals build -ldflags="-s -w" -o "$BINARY" .
+info "Compiling Go binary (CGO_ENABLED=0, garble obfuscation)..."
+GOTOOLCHAIN=local CGO_ENABLED=0 go tool garble -literals build -ldflags="-s -w" -o "$BINARY" .
 
-# 自检：确认产物是静态链接
+# Verify: ensure the binary is statically linked
 if ! file "$BINARY" | grep -q "statically linked"; then
-    err "编译产物不是静态链接！请检查 CGO_ENABLED 设置"
+    err "Binary is not statically linked! Check CGO_ENABLED setting"
     exit 1
 fi
-info "编译完成: $SCRIPT_DIR/$BINARY（静态链接）"
+info "Compile done: $SCRIPT_DIR/$BINARY (statically linked)"
 
-# ---- Step 2: 准备 Docker 构建上下文 ----
+# ---- Step 2: Prepare Docker build context ----
 BUILD_DIR="$(mktemp -d -t zngp-server_build_XXXXXX)"
 trap "rm -rf $BUILD_DIR" EXIT
-info "准备构建上下文: $BUILD_DIR"
+info "Preparing build context: $BUILD_DIR"
 
 cp "$SCRIPT_DIR/$BINARY" "$BUILD_DIR/"
 cp "$SCRIPT_DIR/Dockerfile" "$BUILD_DIR/"
-# 镜像内只放占位配置（由 cfg.yml.template 生成），真实密钥一律通过运行时挂载注入，绝不打包进镜像
+# Image only contains placeholder config (generated from cfg.yml.template).
+# Real secrets are injected via runtime volume mounts, never baked into the image.
 if [[ ! -f "$SCRIPT_DIR/cfg.yml.template" ]]; then
-    err "缺少 cfg.yml.template，无法生成默认配置"
+    err "cfg.yml.template not found, cannot generate default config"
     exit 1
 fi
 cp "$SCRIPT_DIR/cfg.yml.template" "$BUILD_DIR/cfg.yml"
 cp -r "$SCRIPT_DIR/web" "$BUILD_DIR/web"
 cp -r "$SCRIPT_DIR/seed" "$BUILD_DIR/seed"
 
-# ---- Step 3: 打 Docker 镜像 ----
-info "构建镜像: $FULL_IMAGE"
+# ---- Step 3: Build Docker image ----
+info "Building image: $FULL_IMAGE"
 docker build -t "$FULL_IMAGE" "$BUILD_DIR"
-info "镜像构建完成: $FULL_IMAGE"
+info "Image built: $FULL_IMAGE"
 
-# ---- Step 4: 可选推送 ----
+# ---- Step 4: Optional push ----
 if $PUSH; then
     if [[ -z "$REGISTRY" ]]; then
-        err "推送需要设置 REGISTRY 环境变量"
+        err "REGISTRY env var is required for push"
         exit 1
     fi
-    info "推送镜像: $FULL_IMAGE"
+    info "Pushing image: $FULL_IMAGE"
     docker push "$FULL_IMAGE"
-    info "推送完成"
+    info "Push done"
 fi
 
-# ---- Step 5: 打包 release ----
+# ---- Step 5: Package release ----
 RELEASE_DIR="$SCRIPT_DIR/zngp-server-release/zngp-server"
 RELEASE_TAR="$SCRIPT_DIR/zngp-server-release-${TAG}.tar.gz"
 rm -rf "$RELEASE_DIR"
 mkdir -p "$RELEASE_DIR"
 
-info "打包 release..."
+info "Packaging release..."
 
-# docker save 镜像
+# docker save image
 docker save -o "$RELEASE_DIR/${IMAGE_NAME}.tar" "$FULL_IMAGE"
 
-# 配置文件（使用模板，真实密钥由部署者填写）
+# Config file (use template, real secrets filled by deployer)
 cp "$SCRIPT_DIR/cfg.yml.template" "$RELEASE_DIR/cfg.yml"
 
-# 启动脚本
+# Startup script
 cat > "$RELEASE_DIR/start.sh" << 'STARTSCRIPT'
 #!/bin/bash
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# 加载镜像
+# Load image
 if [ ! "$(docker images -q zngp-server:latest 2>/dev/null)" ]; then
-    echo ">>> 加载 Docker 镜像..."
+    echo ">>> Loading Docker image..."
     docker load < "$SCRIPT_DIR/zngp-server.tar"
 fi
 
-# 创建数据目录（持久化）
+# Create data dir (persistent)
 mkdir -p "$SCRIPT_DIR/data/uploads"
 
-# 停止旧容器
+# Stop old container
 docker stop zngp-server 2>/dev/null || true
 docker rm zngp-server 2>/dev/null || true
 
-# 启动容器
-echo ">>> 启动 zngp-server..."
+# Start container
+echo ">>> Starting zngp-server..."
 docker run -d \
     --name zngp-server \
     --restart always \
@@ -166,29 +162,29 @@ docker run -d \
     -v "$SCRIPT_DIR/data:/opt/zngp/data" \
     zngp-server:latest
 
-echo ">>> 服务已启动: http://localhost:8080"
-echo ">>> 查看日志: docker logs -f zngp-server"
+echo ">>> Service started: https://localhost:8080"
+echo ">>> View logs: docker logs -f zngp-server"
 STARTSCRIPT
 chmod +x "$RELEASE_DIR/start.sh"
 
-# 打包 tar.gz
+# Package tar.gz
 cd "$SCRIPT_DIR/zngp-server-release"
 tar czf "$RELEASE_TAR" "zngp-server"
 cd "$SCRIPT_DIR"
 rm -rf "$RELEASE_DIR"
 
-# ---- 镜像信息 ----
+# ---- Image info ----
 echo ""
-info "========== 镜像信息 =========="
+info "========== Image Info =========="
 docker images "$FULL_IMAGE" --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
 echo ""
 info "========== Release =========="
 ls -lh "$RELEASE_TAR"
 echo ""
-info "交付步骤:"
-echo "  1. 将 $(basename "$RELEASE_TAR") 拷贝到目标机器"
-echo "  2. 解压: tar xzf $(basename "$RELEASE_TAR")"
-echo "  3. 编辑 cfg.yml 填写 ASR/LLM 的 API Key"
-echo "  4. 启动: cd zngp-server && ./start.sh"
-echo "  5. 打开浏览器 http://<服务器IP>:8080"
-echo "  6. 查看日志: docker logs -f zngp-server"
+info "Delivery steps:"
+echo "  1. Copy $(basename "$RELEASE_TAR") to target machine"
+echo "  2. Extract: tar xzf $(basename "$RELEASE_TAR")"
+echo "  3. Edit cfg.yml and fill in ASR/LLM API keys"
+echo "  4. Start: cd zngp-server && ./start.sh"
+echo "  5. Open browser: https://<server-ip>:8080"
+echo "  6. View logs: docker logs -f zngp-server"

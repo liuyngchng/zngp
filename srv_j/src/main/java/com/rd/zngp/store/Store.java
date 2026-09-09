@@ -1,5 +1,7 @@
 package com.rd.zngp.store;
 
+import com.alibaba.druid.pool.DruidDataSource;
+import com.rd.zngp.config.Config;
 import com.rd.zngp.model.*;
 import com.rd.zngp.model.Record;
 import com.zaxxer.hikari.HikariConfig;
@@ -15,25 +17,47 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * SQLite-backed data store, mirroring server/internal/store/store.go and methods.go.
- * Uses HikariCP connection pool for thread safety with Netty's concurrent worker threads.
+ * Data store supporting SQLite (HikariCP) and MySQL (Druid), mirroring
+ * server/internal/store/store.go. Backend is selected by cfg.database.type:
+ * "sqlite" (default) or "mysql".
  */
 public class Store {
 
     private static final Logger log = LoggerFactory.getLogger(Store.class);
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+    private static final DateTimeFormatter DTF_SQLITE = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+    private static final DateTimeFormatter DTF_MYSQL = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private final String dbPath;
-    private HikariDataSource dataSource;
+    private final Config.DatabaseConfig dbCfg;
+    private final boolean mysql;
+    private final DateTimeFormatter dtf;
 
-    public Store(String dbPath) {
-        this.dbPath = dbPath;
+    private HikariDataSource sqliteDataSource;
+    private DruidDataSource mysqlDataSource;
+
+    public Store(Config.DatabaseConfig dbCfg) {
+        this.dbCfg = dbCfg;
+        this.mysql = "mysql".equalsIgnoreCase(dbCfg.type) && dbCfg.dsn != null && !dbCfg.dsn.isEmpty();
+        this.dtf = mysql ? DTF_MYSQL : DTF_SQLITE;
     }
 
     /**
      * Initialize the database: create directories, setup connection pool, migrate tables.
      */
     public void init() throws SQLException {
+        if (mysql) {
+            initMysql();
+        } else {
+            initSqlite();
+        }
+        migrate();
+        log.info("db_init_done: {}", mysql ? dbCfg.dsn : dbCfg.path);
+    }
+
+    private void initSqlite() throws SQLException {
+        String dbPath = dbCfg.path;
+        if (dbPath == null || dbPath.isEmpty()) {
+            dbPath = "./data/zngp.db";
+        }
         File dbFile = new File(dbPath);
         File parent = dbFile.getParentFile();
         if (parent != null && !parent.exists()) {
@@ -55,22 +79,64 @@ public class Store {
         config.setIdleTimeout(600000);
         config.setPoolName("zngp-sqlite-pool");
 
-        dataSource = new HikariDataSource(config);
+        sqliteDataSource = new HikariDataSource(config);
 
         // Run pragmas on the first connection to configure WAL mode
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = sqliteDataSource.getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute("PRAGMA foreign_keys = ON");
             stmt.execute("PRAGMA journal_mode = WAL");
             stmt.execute("PRAGMA synchronous = NORMAL");
         }
+    }
 
-        migrate();
-        log.info("db_init_done: {}", dbPath);
+    private void initMysql() throws SQLException {
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+        } catch (ClassNotFoundException e) {
+            throw new SQLException("MySQL JDBC driver not found", e);
+        }
+
+        DruidDataSource ds = new DruidDataSource();
+        ds.setUrl(dbCfg.dsn);
+        if (dbCfg.username != null && !dbCfg.username.isEmpty()) {
+            ds.setUsername(dbCfg.username);
+        }
+        if (dbCfg.password != null && !dbCfg.password.isEmpty()) {
+            ds.setPassword(dbCfg.password);
+        }
+        ds.setInitialSize(2);
+        ds.setMinIdle(2);
+        ds.setMaxActive(10);
+        ds.setMaxWait(10000);
+        ds.setValidationQuery("SELECT 1");
+        ds.setTestWhileIdle(true);
+        ds.setTestOnBorrow(false);
+        ds.setTestOnReturn(false);
+        ds.setTimeBetweenEvictionRunsMillis(60000);
+        ds.setMinEvictableIdleTimeMillis(300000);
+        ds.setName("zngp-mysql-pool");
+
+        // Initialize the pool eagerly so misconfiguration fails fast at startup
+        ds.init();
+        mysqlDataSource = ds;
+    }
+
+    private Connection getConnection() throws SQLException {
+        return mysql ? mysqlDataSource.getConnection() : sqliteDataSource.getConnection();
     }
 
     private void migrate() throws SQLException {
-        try (Connection conn = dataSource.getConnection();
+        if (mysql) {
+            migrateMysql();
+        } else {
+            migrateSqlite();
+        }
+        log.info("db_migration_done");
+    }
+
+    private void migrateSqlite() throws SQLException {
+        try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute("CREATE TABLE IF NOT EXISTS users (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -154,27 +220,100 @@ public class Store {
                 stmt.execute("ALTER TABLE users ADD COLUMN password_expires_at TEXT");
             } catch (SQLException ignored) {}
         }
-        log.info("db_migration_done");
+    }
+
+    private void migrateMysql() throws SQLException {
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE TABLE IF NOT EXISTS users (" +
+                "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
+                "username VARCHAR(255) UNIQUE NOT NULL," +
+                "password_hash VARCHAR(255) NOT NULL," +
+                "role VARCHAR(50) DEFAULT 'admin'," +
+                "must_change_password TINYINT DEFAULT 0," +
+                "password_expires_at DATETIME NULL," +
+                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                ")");
+
+            stmt.execute("CREATE TABLE IF NOT EXISTS records (" +
+                "id VARCHAR(64) PRIMARY KEY," +
+                "title VARCHAR(255)," +
+                "description TEXT," +
+                "inspector_name VARCHAR(255)," +
+                "customer_name VARCHAR(255)," +
+                "customer_address VARCHAR(512)," +
+                "inspection_date DATETIME," +
+                "source_type VARCHAR(50) DEFAULT 'RECORDING'," +
+                "audio_file_path VARCHAR(512)," +
+                "audio_duration DOUBLE DEFAULT 0," +
+                "transcript_text LONGTEXT," +
+                "transcript_status VARCHAR(50) DEFAULT 'PENDING'," +
+                "inspection_status VARCHAR(50) DEFAULT 'NONE'," +
+                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP," +
+                "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                ")");
+
+            stmt.execute("CREATE TABLE IF NOT EXISTS inspection_templates (" +
+                "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
+                "name VARCHAR(255) NOT NULL," +
+                "description TEXT," +
+                "category VARCHAR(100)," +
+                "is_active TINYINT DEFAULT 1," +
+                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP," +
+                "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                ")");
+
+            stmt.execute("CREATE TABLE IF NOT EXISTS inspection_items (" +
+                "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
+                "template_id BIGINT NOT NULL," +
+                "item_number INT," +
+                "name VARCHAR(255) NOT NULL," +
+                "description TEXT," +
+                "category VARCHAR(100)," +
+                "is_required TINYINT DEFAULT 1," +
+                "weight INT DEFAULT 1," +
+                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                ")");
+
+            stmt.execute("CREATE TABLE IF NOT EXISTS inspection_results (" +
+                "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
+                "record_id VARCHAR(64) NOT NULL," +
+                "template_id BIGINT," +
+                "overall_conclusion VARCHAR(50)," +
+                "overall_score INT DEFAULT 0," +
+                "summary TEXT," +
+                "raw_llm_response LONGTEXT," +
+                "model_used VARCHAR(255)," +
+                "tokens_used INT DEFAULT 0," +
+                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                ")");
+
+            stmt.execute("CREATE TABLE IF NOT EXISTS item_results (" +
+                "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
+                "inspection_result_id BIGINT NOT NULL," +
+                "item_id BIGINT," +
+                "item_name VARCHAR(255)," +
+                "verdict VARCHAR(50)," +
+                "evidence TEXT," +
+                "confidence DOUBLE DEFAULT 0," +
+                "ai_reasoning TEXT" +
+                ")");
+        }
     }
 
     // ---- Helpers ----
 
     private String now() {
-        return LocalDateTime.now().format(DTF);
+        return LocalDateTime.now().format(dtf);
     }
 
     private LocalDateTime parseDT(String s) {
         if (s == null || s.isEmpty()) return null;
         try {
-            return LocalDateTime.parse(s, DTF);
+            return LocalDateTime.parse(s, dtf);
         } catch (Exception e) {
             return null;
         }
-    }
-
-    /** Get a connection from the pool (must be closed by caller). */
-    private Connection getConnection() throws SQLException {
-        return dataSource.getConnection();
     }
 
     // ---- User methods ----
@@ -212,7 +351,7 @@ public class Store {
             ps.setString(2, user.passwordHash);
             ps.setString(3, user.role);
             ps.setInt(4, user.mustChangePassword ? 1 : 0);
-            ps.setString(5, user.passwordExpiresAt != null ? user.passwordExpiresAt.format(DTF) : null);
+            ps.setString(5, user.passwordExpiresAt != null ? user.passwordExpiresAt.format(dtf) : null);
             ps.setString(6, now());
             ps.executeUpdate();
         }
@@ -255,7 +394,7 @@ public class Store {
             ps.setString(4, record.inspectorName);
             ps.setString(5, record.customerName);
             ps.setString(6, record.customerAddress);
-            ps.setString(7, record.inspectionDate != null ? record.inspectionDate.format(DTF) : now());
+            ps.setString(7, record.inspectionDate != null ? record.inspectionDate.format(dtf) : now());
             ps.setString(8, record.sourceType);
             ps.setString(9, record.audioFilePath);
             ps.setDouble(10, record.audioDuration);
@@ -747,8 +886,11 @@ public class Store {
     }
 
     public void close() {
-        if (dataSource != null && !dataSource.isClosed()) {
-            dataSource.close();
+        if (mysqlDataSource != null) {
+            mysqlDataSource.close();
+        }
+        if (sqliteDataSource != null && !sqliteDataSource.isClosed()) {
+            sqliteDataSource.close();
         }
         log.info("数据库连接池已关闭");
     }

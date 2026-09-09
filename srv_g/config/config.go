@@ -21,6 +21,8 @@ type ServerConfig struct {
 	Host      string `yaml:"host"`
 	LogLevel  string `yaml:"log_level"`
 	LogFormat string `yaml:"log_format"`
+	CertFile  string `yaml:"cert_file"`
+	KeyFile   string `yaml:"key_file"`
 }
 
 type SystemConfig struct {
@@ -84,6 +86,12 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Server.LogFormat == "" {
 		cfg.Server.LogFormat = "text"
+	}
+	if cfg.Server.CertFile == "" {
+		cfg.Server.CertFile = "./data/server.crt"
+	}
+	if cfg.Server.KeyFile == "" {
+		cfg.Server.KeyFile = "./data/server.key"
 	}
 	if cfg.System.Name == "" {
 		cfg.System.Name = "ZNGP 服务质量平台"

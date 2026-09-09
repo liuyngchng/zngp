@@ -6,6 +6,7 @@ import com.rd.zngp.model.InspectionItem;
 import com.rd.zngp.model.InspectionTemplate;
 import com.rd.zngp.model.User;
 import com.rd.zngp.store.Store;
+import com.rd.zngp.util.CertGen;
 import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +35,7 @@ public class App {
             log.info("config_loaded: system={}", cfg.system.name);
 
             // Initialize store
-            Store store = new Store(cfg.database.path);
+            Store store = new Store(cfg.database);
             store.init();
 
             // Ensure default admin user
@@ -44,10 +45,13 @@ public class App {
             // Seed templates
             seedTemplates(store);
 
+            // Ensure TLS certificate exists (generate self-signed if missing)
+            CertGen.ensureCert(cfg.server.certFile, cfg.server.keyFile);
+
             // Start Netty HTTP server
             NettyHttpServer server = new NettyHttpServer(store);
             int port = Integer.parseInt(cfg.server.port);
-            server.start(cfg.server.host, port);
+            server.start(cfg.server.host, port, cfg.server.certFile, cfg.server.keyFile);
 
         } catch (Exception e) {
             log.error("startup_failed", e);

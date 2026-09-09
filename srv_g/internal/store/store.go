@@ -3,6 +3,7 @@ package store
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"github.com/zngp/server/config"
@@ -50,6 +51,26 @@ func New(cfg config.DatabaseConfig) (*Store, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	// Configure the underlying database/sql connection pool.
+	// MySQL defaults (MaxOpenConns = 0) allow unbounded growth, which can
+	// exhaust the database server, so cap it explicitly. SQLite serializes
+	// writes and keeps a single connection.
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Type == "mysql" {
+		sqlDB.SetMaxOpenConns(25)
+		sqlDB.SetMaxIdleConns(25)
+		sqlDB.SetConnMaxLifetime(3 * time.Minute)
+		sqlDB.SetConnMaxIdleTime(3 * time.Minute)
+	} else {
+		sqlDB.SetMaxOpenConns(1)
+		sqlDB.SetMaxIdleConns(1)
+		sqlDB.SetConnMaxLifetime(3 * time.Minute)
+		sqlDB.SetConnMaxIdleTime(3 * time.Minute)
 	}
 
 	// Enable foreign keys for SQLite

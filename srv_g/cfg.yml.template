@@ -3,6 +3,8 @@ server:
   host: "0.0.0.0"
   log_level: "info"
   log_format: "text"
+  cert_file: "./data/server.crt"
+  key_file: "./data/server.key"
 
 system:
   name: "客户服务质量平台"

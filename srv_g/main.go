@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/zngp/server/config"
+	"github.com/zngp/server/internal/certgen"
 	"github.com/zngp/server/internal/handler"
 	"github.com/zngp/server/internal/logx"
 	"github.com/zngp/server/internal/middleware"
@@ -31,6 +32,12 @@ func main() {
 
 	// Initialize logging (level: debug/info/warn/error, format: text/json)
 	logx.Init(logx.Level(cfg.Server.LogLevel), cfg.Server.LogFormat)
+
+	// Ensure TLS certificate exists (generate self-signed if missing)
+	if err := certgen.EnsureCert(cfg.Server.CertFile, cfg.Server.KeyFile); err != nil {
+		logx.Fatal("cert_ensure_failed", "err", err)
+	}
+	logx.Info("tls_cert_ready", "cert", cfg.Server.CertFile, "key", cfg.Server.KeyFile)
 
 	// Initialize store (SQLite by default; MySQL if configured)
 	st, err := store.New(cfg.Database)
@@ -193,9 +200,9 @@ func main() {
 	}()
 
 	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
-	logx.Info("server_starting_http", "addr", addr)
+	logx.Info("server_starting_https", "addr", addr)
 	printAccessURLs(cfg.Server.Port)
-	if err := r.Run(addr); err != nil {
+	if err := r.RunTLS(addr, cfg.Server.CertFile, cfg.Server.KeyFile); err != nil {
 		logx.Fatal("server_run_failed", "err", err)
 	}
 }
@@ -204,11 +211,11 @@ func main() {
 func printAccessURLs(port string) {
 	ips := collectLocalIPs()
 	if len(ips) == 0 {
-		logx.Info("server_access_url", "url", fmt.Sprintf("http://127.0.0.1:%s", port))
+		logx.Info("server_access_url", "url", fmt.Sprintf("https://127.0.0.1:%s", port))
 		return
 	}
 	for _, ip := range ips {
-		logx.Info("server_access_url", "url", fmt.Sprintf("http://%s:%s", ip, port))
+		logx.Info("server_access_url", "url", fmt.Sprintf("https://%s:%s", ip, port))
 	}
 }
 

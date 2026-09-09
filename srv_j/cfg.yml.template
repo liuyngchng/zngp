@@ -1,14 +1,19 @@
 server:
   port: "8080"
   host: "0.0.0.0"
+  cert_file: "./data/server.crt"
+  key_file: "./data/server.key"
 
 system:
   name: "客户服务质量平台"
 
 database:
   # 数据库类型: sqlite (默认) / mysql。配置 mysql 时使用 MySQL，否则使用 SQLite。
+  type: "sqlite"
   # type: "mysql"
-  # dsn: "user:password@tcp(127.0.0.1:3306)/zngp?charset=utf8mb4&parseTime=True&loc=Local"
+  # dsn: "jdbc:mysql://127.0.0.1:3306/zngp?charset=utf8mb4&useSSL=false&serverTimezone=Asia/Shanghai"
+  # username: "root"
+  # password: "your_password"
   path: "./data/zngp.db"
 
 auth:
