@@ -15,35 +15,35 @@
                 <span th:text="${sysName}">system</span>
             </a>
             <nav class="sidebar-nav">
-                <div class="nav-group-title">business</div>
+                <div class="nav-group-title">业务管理</div>
                 <a href="/" class="side-link" th:classappend="${content_block == 'content_dashboard'} ? 'active'">
-                    <i class="fas fa-tachometer-alt"></i> dashboard
+                    <i class="fas fa-tachometer-alt"></i> 仪表盘
                 </a>
                 <a href="/upload" class="side-link" th:classappend="${content_block == 'content_upload'} ? 'active'">
-                    <i class="fas fa-cloud-upload-alt"></i> upload
+                    <i class="fas fa-cloud-upload-alt"></i> 资料上传
                 </a>
                 <a href="/records" class="side-link"
                    th:classappend="${content_block == 'content_records' or content_block == 'content_record_detail'} ? 'active'">
-                    <i class="fas fa-list-alt"></i> records
+                    <i class="fas fa-list-alt"></i> 记录列表
                 </a>
                 <a href="/templates" class="side-link"
                    th:classappend="${content_block == 'content_templates' or content_block == 'content_template_edit'} ? 'active'">
-                    <i class="fas fa-clipboard-check"></i> templates
+                    <i class="fas fa-clipboard-check"></i> 检查项模板
                 </a>
-                <div class="nav-group-title">system</div>
+                <div class="nav-group-title">系统</div>
                 <a href="/config" class="side-link" th:classappend="${content_block == 'content_config'} ? 'active'">
-                    <i class="fas fa-cog"></i> config
+                    <i class="fas fa-cog"></i> 系统配置
                 </a>
             </nav>
             <div class="sidebar-footer">
                 <a href="/logout" class="side-link side-link-danger">
-                    <i class="fas fa-sign-out-alt"></i> logout
+                    <i class="fas fa-sign-out-alt"></i> 退出登录
                 </a>
             </div>
         </aside>
         <div class="main-area">
             <main class="main-content">
-                <th:block th:insert="${content_template} :: content" />
+                <th:block th:insert="~{${content_template} :: content}" />
             </main>
         </div>
     </div>

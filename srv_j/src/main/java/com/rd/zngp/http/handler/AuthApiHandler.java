@@ -75,9 +75,17 @@ public class AuthApiHandler {
             String oldPassword = (String) body.get("old_password");
             String newPassword = (String) body.get("new_password");
 
-            if (oldPassword == null || newPassword == null || newPassword.length() < 6) {
+            if (oldPassword == null || newPassword == null || newPassword.isEmpty()) {
                 log.warn("change_password_failed_invalid_params: username={}", auth.username);
-                HttpHelpers.sendAndClose(ctx, req, HttpHelpers.json(400, HttpHelpers.errorMap("old password and new password (min 6 chars) required")));
+                HttpHelpers.sendAndClose(ctx, req, HttpHelpers.json(400, HttpHelpers.errorMap("old password and new password required")));
+                return;
+            }
+
+            // Validate password strength
+            String weakMsg = validatePassword(newPassword);
+            if (weakMsg != null) {
+                log.warn("change_password_failed_weak_password: username={}", auth.username);
+                HttpHelpers.sendAndClose(ctx, req, HttpHelpers.json(400, HttpHelpers.errorMap(weakMsg)));
                 return;
             }
 
@@ -106,5 +114,37 @@ public class AuthApiHandler {
         result.put("username", auth.username);
         result.put("must_change_password", auth.mustChangePassword);
         HttpHelpers.sendAndClose(ctx, req, HttpHelpers.json(200, result));
+    }
+
+    /**
+     * Validate password strength: at least 15 characters, and must contain
+     * at least one letter, one digit, and one symbol. Returns an error message,
+     * or null if the password passes.
+     */
+    private static String validatePassword(String password) {
+        if (password.length() < 15) {
+            return "密码长度至少15位";
+        }
+        boolean hasLetter = false, hasDigit = false, hasSymbol = false;
+        for (int i = 0; i < password.length(); i++) {
+            char c = password.charAt(i);
+            if (Character.isLetter(c)) {
+                hasLetter = true;
+            } else if (Character.isDigit(c)) {
+                hasDigit = true;
+            } else {
+                hasSymbol = true;
+            }
+        }
+        if (!hasLetter) {
+            return "密码必须包含至少一个字母";
+        }
+        if (!hasDigit) {
+            return "密码必须包含至少一个数字";
+        }
+        if (!hasSymbol) {
+            return "密码必须包含至少一个特殊符号";
+        }
+        return null;
     }
 }

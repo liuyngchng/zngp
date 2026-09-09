@@ -31,7 +31,8 @@ public class TemplateRenderer {
     }
 
     /**
-     * Render a page template via the layout.
+     * Render a page template via the layout (with sidebar etc.).
+     * The page template must define a {@code content} fragment.
      * @param pageName e.g. "dashboard", "records", "record_detail"
      * @param data template variables
      */
@@ -40,13 +41,32 @@ public class TemplateRenderer {
             data = new java.util.LinkedHashMap<>();
         }
         data.put("sysName", Config.appConfig.system.name);
-        // Tell the layout which content fragment to use
-        data.put("content_template", pageName + " :: content");
+        // Tell the layout which template to pull the "content" fragment from
+        data.put("content_template", pageName);
 
         Context ctx = new Context();
         for (Map.Entry<String, Object> e : data.entrySet()) {
             ctx.setVariable(e.getKey(), e.getValue());
         }
         return engine.process("layout", ctx);
+    }
+
+    /**
+     * Render a standalone page directly (no layout wrapper).
+     * Use for pages like login that have their own full HTML structure.
+     * @param pageName e.g. "login"
+     * @param data template variables
+     */
+    public static String renderStandalone(String pageName, Map<String, Object> data) {
+        if (data == null) {
+            data = new java.util.LinkedHashMap<>();
+        }
+        data.put("sysName", Config.appConfig.system.name);
+
+        Context ctx = new Context();
+        for (Map.Entry<String, Object> e : data.entrySet()) {
+            ctx.setVariable(e.getKey(), e.getValue());
+        }
+        return engine.process(pageName, ctx);
     }
 }

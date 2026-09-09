@@ -40,6 +40,9 @@ public class Config {
         @JsonProperty("port")
         public String port = "8080";
 
+        @JsonProperty("http_port")
+        public String httpPort = "8081";
+
         @JsonProperty("host")
         public String host = "0.0.0.0";
 
@@ -136,7 +139,7 @@ public class Config {
         Config cfg = mapper.readValue(new File(path), Config.class);
 
         // Apply defaults
-        if (cfg.server.port == null || cfg.server.port.isEmpty()) cfg.server.port = "8080";
+        if (cfg.server.httpPort == null || cfg.server.httpPort.isEmpty()) cfg.server.httpPort = "8081";
         if (cfg.server.host == null || cfg.server.host.isEmpty()) cfg.server.host = "0.0.0.0";
         if (cfg.server.certFile == null || cfg.server.certFile.isEmpty()) cfg.server.certFile = "./data/server.crt";
         if (cfg.server.keyFile == null || cfg.server.keyFile.isEmpty()) cfg.server.keyFile = "./data/server.key";

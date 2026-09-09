@@ -28,7 +28,7 @@ public class WebHandler {
     public static void renderLogin(ChannelHandlerContext ctx, FullHttpRequest req) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("title", "login");
-        HttpHelpers.sendAndClose(ctx, req, html(200, TemplateRenderer.render("login", data)));
+        HttpHelpers.sendAndClose(ctx, req, html(200, TemplateRenderer.renderStandalone("login", data)));
     }
 
     public static void renderDashboard(ChannelHandlerContext ctx, FullHttpRequest req) {

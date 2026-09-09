@@ -16,6 +16,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.InputStream;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
 import java.util.Map;
 
 import static com.rd.zngp.http.HttpHelpers.*;
@@ -100,7 +103,7 @@ public class NettyHttpServer {
                 .childOption(ChannelOption.SO_KEEPALIVE, true);
 
             log.info("server_starting: https://{}:{}", host, port);
-            log.info("server_access_url: https://127.0.0.1:{}", port);
+            listLocalAddresses(port);
             ChannelFuture f = b.bind(host, port).sync();
             f.channel().closeFuture().sync();
         } finally {
@@ -112,6 +115,34 @@ public class NettyHttpServer {
     // ============================================================
     // Main router handler
     // ============================================================
+
+    /**
+     * Log all local network interface addresses so the user knows which URLs
+     * to use to reach the server over the LAN.
+     */
+    private static void listLocalAddresses(int port) {
+        try {
+            Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
+            while (ifaces.hasMoreElements()) {
+                NetworkInterface ni = ifaces.nextElement();
+                if (!ni.isUp() || ni.isLoopback()) continue;
+                Enumeration<InetAddress> addrs = ni.getInetAddresses();
+                while (addrs.hasMoreElements()) {
+                    InetAddress addr = addrs.nextElement();
+                    if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()) continue;
+                    String ip = addr.getHostAddress();
+                    if (ip.contains(":")) {
+                        log.info("server_access_url: https://[{}]:{}", ip, port);
+                    } else {
+                        log.info("server_access_url: https://{}:{}", ip, port);
+                    }
+                }
+            }
+            log.info("server_access_url: https://127.0.0.1:{}", port);
+        } catch (Exception e) {
+            log.warn("list_local_addresses_failed", e);
+        }
+    }
 
     private class RouterHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
@@ -154,7 +185,15 @@ public class NettyHttpServer {
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            log.error("connection_error", cause);
+            // SSL handshake failures from browsers that don't trust our self-signed
+            // cert are expected — demote to WARN so they don't look like real errors.
+            Throwable root = cause;
+            while (root.getCause() != null) root = root.getCause();
+            if (root instanceof javax.net.ssl.SSLHandshakeException) {
+                log.warn("ssl_handshake_failed (expected with self-signed cert): {}", root.getMessage());
+            } else {
+                log.error("connection_error", cause);
+            }
             ctx.close();
         }
     }
@@ -354,6 +393,13 @@ public class NettyHttpServer {
         Map<String, String> queryParams = RequestHelpers.parseQuery(req.uri());
         AuthHelper.AuthInfo auth = AuthHelper.extractAuth(req);
 
+        // Public pages: /login is always reachable, otherwise unauthenticated
+        // users get stuck in an infinite redirect loop (login -> 302 -> login).
+        if (path.equals("/login")) {
+            WebHandler.renderLogin(ctx, req);
+            return;
+        }
+
         // Auth guard
         if (!auth.valid) {
             FullHttpResponse resp = redirect("/login");
@@ -368,10 +414,6 @@ public class NettyHttpServer {
 
         FullHttpResponse resp = null;
         try {
-            if (path.equals("/login")) {
-                WebHandler.renderLogin(ctx, req);
-                return;
-            }
             if (path.equals("/")) {
                 WebHandler.renderDashboard(ctx, req);
                 return;

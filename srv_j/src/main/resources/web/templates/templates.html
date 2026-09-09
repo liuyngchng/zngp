@@ -3,40 +3,40 @@
 <head><meta charset="UTF-8"></head>
 <body><th:block th:fragment="content">
 <div class="page-header">
-    <h1><i class="fas fa-clipboard-check"></i> templates</h1>
+    <h1><i class="fas fa-clipboard-check"></i> 检查项模板</h1>
 </div>
 <div class="section">
     <th:block th:if="${!#lists.isEmpty(templates)}">
     <div class="tabs">
         <button th:each="t, st : ${templates}" class="tab-btn" th:classappend="${st.index == 0} ? 'active'"
                 th:attr="data-tab='tpl-' + ${t.id}, onclick='switchTab(\'tpl-' + ${t.id} + '\', this)'">
-            <i class="fas fa-clipboard-list"></i> <span th:text="${t.name}">name</span>
+            <i class="fas fa-clipboard-list"></i> <span th:text="${t.name}">名称</span>
         </button>
     </div>
     <div th:each="t, st : ${templates}" class="tab-panel" th:classappend="${st.index == 0} ? 'active'" th:attr="id='tpl-' + ${t.id}">
         <div class="template-header">
-            <p class="template-desc" th:text="${t.description}">desc</p>
-            <span class="badge badge-blue" th:text="${t.category}">category</span>
+            <p class="template-desc" th:text="${t.description}">描述</p>
+            <span class="badge badge-blue" th:text="${t.category}">分类</span>
         </div>
         <div class="template-items">
             <table class="table">
-                <thead><tr><th style="width:60px">no.</th><th>item</th><th>category</th><th>required</th><th>weight</th></tr></thead>
+                <thead><tr><th style="width:60px">序号</th><th>检查项</th><th>分类</th><th>必检</th><th>权重</th></tr></thead>
                 <tbody>
                     <tr th:each="it : ${t.items}">
                         <td th:text="${it.itemNumber}">1</td>
-                        <td><strong th:text="${it.name}">name</strong><br th:if="${it.description != null and !it.description.isEmpty()}"><small th:if="${it.description != null and !it.description.isEmpty()}" class="text-muted" th:text="${it.description}">desc</small></td>
-                        <td th:text="${it.category}">category</td>
+                        <td><strong th:text="${it.name}">名称</strong><br th:if="${it.description != null and !it.description.isEmpty()}"><small th:if="${it.description != null and !it.description.isEmpty()}" class="text-muted" th:text="${it.description}">描述</small></td>
+                        <td th:text="${it.category}">分类</td>
                         <td><i th:if="${it.isRequired}" class="fas fa-check" style="color:var(--green)"></i><i th:unless="${it.isRequired}" class="fas fa-minus" style="color:var(--gray)"></i></td>
                         <td th:text="${it.weight}">1</td>
                     </tr>
                 </tbody>
             </table>
         </div>
-        <a th:href="@{/templates/{id}/edit(id=${t.id})}" class="btn btn-outline"><i class="fas fa-edit"></i> edit</a>
+        <a th:href="@{/templates/{id}/edit(id=${t.id})}" class="btn btn-outline"><i class="fas fa-edit"></i> 编辑</a>
     </div>
     </th:block>
     <div th:if="${#lists.isEmpty(templates)}" class="empty-state">
-        <i class="fas fa-clipboard"></i><p>no templates</p>
+        <i class="fas fa-clipboard"></i><p>暂无模板</p>
     </div>
 </div>
 <script>

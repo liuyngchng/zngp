@@ -68,7 +68,7 @@ public class App {
             long count = store.countUsers();
             if (count > 0) return;
 
-            String password = generateRandomPassword(12);
+            String password = generateRandomPassword(15);
             String hash = BCrypt.hashpw(password, BCrypt.gensalt());
             User user = new User();
             user.username = Config.appConfig.auth.username;
@@ -96,6 +96,12 @@ public class App {
         StringBuilder sb = new StringBuilder(length);
         for (int i = 0; i < length; i++) {
             sb.append(PASSWORD_CHARS.charAt(RANDOM.nextInt(PASSWORD_CHARS.length())));
+        }
+        // Guarantee complexity: force one letter, one digit, one symbol
+        if (length >= 3) {
+            sb.setCharAt(0, PASSWORD_CHARS.charAt(RANDOM.nextInt(52)));                    // a-zA-Z
+            sb.setCharAt(1, PASSWORD_CHARS.charAt(52 + RANDOM.nextInt(10)));                // 0-9
+            sb.setCharAt(2, PASSWORD_CHARS.charAt(62 + RANDOM.nextInt(PASSWORD_CHARS.length() - 62))); // symbols
         }
         return sb.toString();
     }
