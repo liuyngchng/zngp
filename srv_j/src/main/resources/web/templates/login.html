@@ -44,7 +44,7 @@
                 <input type="hidden" id="old_password" name="old_password">
                 <div class="login-field">
                     <label><i class="fas fa-key"></i> 新密码</label>
-                    <input type="password" id="new_password" name="new_password" required placeholder="新密码（至少 6 位）" autocomplete="new-password">
+                    <input type="password" id="new_password" name="new_password" required placeholder="15位以上，含字母、数字和符号" autocomplete="new-password">
                 </div>
                 <div class="login-field">
                     <label><i class="fas fa-check-circle"></i> 确认密码</label>
@@ -101,11 +101,6 @@
             const errEl = document.getElementById('changePwdError');
             const errMsg = document.getElementById('changePwdErrorMsg');
 
-            if (newPassword.length < 6) {
-                errMsg.textContent = '新密码至少需要 6 位';
-                errEl.style.display = 'flex';
-                return;
-            }
             if (newPassword !== confirmPassword) {
                 errMsg.textContent = '两次输入的密码不一致';
                 errEl.style.display = 'flex';
