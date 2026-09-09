@@ -101,7 +101,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 
 	// Validate password strength
 	if msg := validatePassword(req.NewPassword); msg != "" {
-		logx.Warn("change_password_failed_weak_password")
+		logx.Warn("change_password_failed_weak_password", "reason", msg)
 		c.JSON(http.StatusBadRequest, gin.H{"error": msg})
 		return
 	}

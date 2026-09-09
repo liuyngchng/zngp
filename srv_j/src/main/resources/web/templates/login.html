@@ -101,6 +101,12 @@
             const errEl = document.getElementById('changePwdError');
             const errMsg = document.getElementById('changePwdErrorMsg');
 
+            const pwErr = checkPasswordStrength(newPassword);
+            if (pwErr) {
+                errMsg.textContent = pwErr;
+                errEl.style.display = 'flex';
+                return;
+            }
             if (newPassword !== confirmPassword) {
                 errMsg.textContent = '两次输入的密码不一致';
                 errEl.style.display = 'flex';
@@ -128,6 +134,21 @@
 
         document.getElementById('loginForm').addEventListener('submit', doLogin);
         document.getElementById('changePwdForm').addEventListener('submit', doChangePassword);
+
+        function checkPasswordStrength(pw) {
+            if (pw.length < 15) return '密码长度至少15位';
+            let hasLetter = false, hasDigit = false, hasSymbol = false;
+            for (let i = 0; i < pw.length; i++) {
+                const c = pw[i];
+                if (/[a-zA-Z]/.test(c)) hasLetter = true;
+                else if (/[0-9]/.test(c)) hasDigit = true;
+                else hasSymbol = true;
+            }
+            if (!hasLetter) return '密码必须包含至少一个字母';
+            if (!hasDigit) return '密码必须包含至少一个数字';
+            if (!hasSymbol) return '密码必须包含至少一个特殊符号';
+            return null;
+        }
     </script>
 </body>
 </html>
